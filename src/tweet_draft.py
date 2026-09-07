@@ -16,7 +16,7 @@ def build_first_day_draft(
 ) -> str:
     avg_text = f"{avg_price_man:.0f}万円" if avg_price_man is not None else "-"
     body = (
-        f"【日次】{area_label} 中古マンション動向\n"
+        f"【日次】{area_label} 動向\n"
         f"監視件数:{listing_count}件 / 平均:{avg_text}\n"
         f"初回取得のため変動比較は翌日以降です。\n"
         f"#不動産 #マンション価格"
@@ -30,7 +30,7 @@ def build_tweet_draft(
     *,
     max_chars: int = DEFAULT_MAX_CHARS,
 ) -> str:
-    header = f"【日次】{area_label} 中古マンション動向"
+    header = f"【日次】{area_label} 動向"
     summary = f"値下げ:{diff.drop_count}件 / 新規:{diff.new_count}件 / 値上げ:{diff.rise_count}件"
 
     if diff.drop_count == 0 and diff.new_count == 0 and diff.rise_count == 0:
