@@ -85,3 +85,12 @@ def test_build_tweet_draft_respects_max_chars() -> None:
     draft = build_tweet_draft("エリア名がとても長い監視ラベル", diff, max_chars=120)
     assert len(draft) <= 120
     assert draft.endswith("…")
+
+
+def test_build_first_day_draft() -> None:
+    from src.tweet_draft import build_first_day_draft
+
+    draft = build_first_day_draft("千代田区", listing_count=550, avg_price_man=12345.6)
+    assert "監視件数:550件" in draft
+    assert "12346万円" in draft or "12345万円" in draft
+    assert len(draft) <= 280

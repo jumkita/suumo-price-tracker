@@ -45,7 +45,11 @@ def test_publish_and_import_roundtrip(tmp_path: Path) -> None:
 
     payload = build_daily_payload(snapshot_date=date(2026, 9, 7), db_path=src_db)
     assert payload["listing_count"] == 1
-    dated, latest = write_published_json(payload, publish_dir=tmp_path / "published")
+    dated, latest = write_published_json(
+        payload,
+        publish_dir=tmp_path / "published",
+        skip_thin_guard=True,
+    )
     assert dated.exists() and latest.exists()
 
     result = import_payload(payload, db_path=dst_db)

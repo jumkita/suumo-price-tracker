@@ -4,14 +4,9 @@ name: Daily SUUMO Price Scrape
 
 on:
   schedule:
-    # 21:30 UTC = 06:30 JST（遅延あり得る。確実起動は repository_dispatch を併用）
+    # 21:30 UTC = 06:30 JST（数分〜数十分の遅延は許容）
     - cron: "30 21 * * *"
   workflow_dispatch:
-    inputs:
-      max_pages:
-        description: "Max pages per ward"
-        required: false
-        default: "50"
   repository_dispatch:
     types: [daily-price-scrape]
 
@@ -23,7 +18,7 @@ jobs:
       contents: write
     env:
       PRICES_DB_PATH: ${{ github.workspace }}/data/prices.db
-      MAX_PAGES: ${{ github.event.inputs.max_pages || '50' }}
+      MAX_PAGES: "50"
       REQUEST_INTERVAL: "2.0"
       TZ: Asia/Tokyo
       PYTHONPATH: ${{ github.workspace }}
@@ -41,19 +36,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Register Tokyo 23 wards
-        run: |
-          export PYTHONPATH="$GITHUB_WORKSPACE"
-          python scripts/register_wards.py --max-pages "${MAX_PAGES}"
+        run: python scripts/register_wards.py --max-pages "${MAX_PAGES}"
 
       - name: Scrape and store snapshots
-        run: |
-          export PYTHONPATH="$GITHUB_WORKSPACE"
-          python scripts/run_daily.py --interval "${REQUEST_INTERVAL}"
+        run: python scripts/run_daily.py --interval "${REQUEST_INTERVAL}"
 
       - name: Export published JSON
-        run: |
-          export PYTHONPATH="$GITHUB_WORKSPACE"
-          python scripts/export_published.py
+        run: python scripts/export_published.py
 
       - name: Commit and push published JSON
         shell: bash
@@ -65,6 +54,16 @@ jobs:
           TODAY_JST="$(TZ=Asia/Tokyo date +%F)"
           TODAY_FILE="data/published/daily_prices_${TODAY_JST}.json"
           LATEST_FILE="data/published/daily_prices.json"
+
+          test -f "$TODAY_FILE"
+          test -f "$LATEST_FILE"
+
+          COUNT="$(python -c "import json; print(json.load(open('$LATEST_FILE', encoding='utf-8'))['listing_count'])")"
+          echo "published_listing_count=${COUNT}"
+          if [[ "${COUNT}" -lt 1000 ]]; then
+            echo "ERROR: published listing_count too small (${COUNT})"
+            exit 1
+          fi
 
           git add "$LATEST_FILE" "$TODAY_FILE"
 

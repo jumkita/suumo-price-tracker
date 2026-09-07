@@ -15,6 +15,7 @@ from src.db import (
     list_watch_configs,
     resolve_db_path,
 )
+from src.publish_guard import assert_publish_not_too_thin
 
 JST = ZoneInfo("Asia/Tokyo")
 DEFAULT_PUBLISH_DIR = Path(__file__).resolve().parent.parent / "data" / "published"
@@ -77,11 +78,15 @@ def build_daily_payload(
 def write_published_json(
     payload: dict,
     publish_dir: Path | None = None,
+    *,
+    skip_thin_guard: bool = False,
 ) -> tuple[Path, Path]:
     out_dir = publish_dir or DEFAULT_PUBLISH_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
     dated = out_dir / f"daily_prices_{payload['snapshot_date']}.json"
     latest = out_dir / "daily_prices.json"
+    if not skip_thin_guard:
+        assert_publish_not_too_thin(payload, latest)
     text = json.dumps(payload, ensure_ascii=False, indent=2)
     dated.write_text(text, encoding="utf-8")
     latest.write_text(text, encoding="utf-8")
@@ -93,11 +98,16 @@ def publish_daily(
     snapshot_date: date | None = None,
     db_path: Path | None = None,
     publish_dir: Path | None = None,
+    skip_thin_guard: bool = False,
 ) -> tuple[Path, Path, dict]:
     payload = build_daily_payload(snapshot_date=snapshot_date, db_path=db_path)
     if not payload["configs"]:
         raise RuntimeError(
             f"no snapshots found for {payload['snapshot_date']}; run scrape first"
         )
-    dated, latest = write_published_json(payload, publish_dir=publish_dir)
+    dated, latest = write_published_json(
+        payload,
+        publish_dir=publish_dir,
+        skip_thin_guard=skip_thin_guard,
+    )
     return dated, latest, payload

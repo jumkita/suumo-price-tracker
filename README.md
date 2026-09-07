@@ -39,42 +39,21 @@ DAILY_PRICES_JSON_URL = "https://raw.githubusercontent.com/jumkita/suumo-price-t
 
 ワークフロー: `Daily SUUMO Price Scrape`
 
-- `schedule`: 毎日 **06:30 JST 目安**（`30 21 * * *` UTC）
-- `workflow_dispatch`: Actions 画面から手動実行
-- `repository_dispatch`: 外部cronから確実に起動（イベント名 `daily-price-scrape`）
+- 毎日 **06:30 JST 目安**に実行（GitHub側の遅延は許容）
+- Actions 画面から手動実行も可能
+- 薄い結果での上書きはガードで拒否（件数半減未満など）
 
 成果物:
 
 - `data/published/daily_prices.json`（最新）
 - `data/published/daily_prices_YYYY-MM-DD.json`（日付別）
 
-### 確実起動（cron-job.org など）
-
-GitHub の `schedule` は遅延し得るため、株分析Appと同様に外部から dispatch できます。
-
-| 項目 | 値 |
-|------|-----|
-| スケジュール | 毎日 **06:30**（タイムゾーン **Asia/Tokyo**） |
-| メソッド | `POST` |
-| URL | `https://api.github.com/repos/jumkita/suumo-price-tracker/dispatches` |
-| ヘッダ | `Accept: application/vnd.github+json`、`Authorization: Bearer <PAT>`、`X-GitHub-Api-Version: 2022-11-28` |
-| ボディ | `{"event_type":"daily-price-scrape"}` |
-
-```bash
-curl -sS -L -X POST \
-  -H "Accept: application/vnd.github+json" \
-  -H "Authorization: Bearer ${GITHUB_PAT_DISPATCH}" \
-  -H "X-GitHub-Api-Version: 2022-11-28" \
-  https://api.github.com/repos/jumkita/suumo-price-tracker/dispatches \
-  -d '{"event_type":"daily-price-scrape"}'
-```
-
 ### ローカル手動
 
 ```bash
 python scripts/register_wards.py --max-pages 50
 python scripts/run_daily.py
-python scripts/export_published.py
+python scripts/bootstrap_previous_day.py --export
 python scripts/sync_from_remote.py
 ```
 
@@ -90,4 +69,4 @@ pytest
 
 ## 補足（非推奨）
 
-Windows タスクスケジューラ（`scripts/manage_scheduler.py`）はPC起動依存のため補助用途です。日常運用は GitHub Actions を使ってください。
+Windows タスクスケジューラはPC起動依存のため使わず、日常運用は GitHub Actions を使ってください。

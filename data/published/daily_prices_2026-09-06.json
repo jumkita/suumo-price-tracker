@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-07T23:43:05+09:00",
-  "snapshot_date": "2026-09-07",
+  "generated_at": "2026-09-07T23:43:04+09:00",
+  "snapshot_date": "2026-09-06",
   "timezone": "Asia/Tokyo",
   "db_path": "C:\\Users\\jukit\\Cursor\\不動産SaaS\\data\\prices.db",
   "config_count": 23,
@@ -13,7 +13,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 550,
-      "fetched_at": "2026-09-07T23:39:09",
+      "fetched_at": "2026-09-07T23:43:03",
       "listings": [
         {
           "property_id": "fp_9685dcbb1658b969",
@@ -6073,7 +6073,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 1421,
-      "fetched_at": "2026-09-07T23:39:09",
+      "fetched_at": "2026-09-07T23:43:03",
       "listings": [
         {
           "property_id": "fp_3b6e4199a4ac56dd",
@@ -21714,7 +21714,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 1431,
-      "fetched_at": "2026-09-07T23:39:09",
+      "fetched_at": "2026-09-07T23:43:03",
       "listings": [
         {
           "property_id": "fp_64aefd3e3ad21f96",
@@ -37465,7 +37465,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 1443,
-      "fetched_at": "2026-09-07T23:39:09",
+      "fetched_at": "2026-09-07T23:43:03",
       "listings": [
         {
           "property_id": "fp_5038dea604df9e1a",
@@ -53348,7 +53348,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 1014,
-      "fetched_at": "2026-09-07T23:39:09",
+      "fetched_at": "2026-09-07T23:43:03",
       "listings": [
         {
           "property_id": "fp_9ab1aa8beee66777",
@@ -64512,7 +64512,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 905,
-      "fetched_at": "2026-09-07T23:39:09",
+      "fetched_at": "2026-09-07T23:43:03",
       "listings": [
         {
           "property_id": "fp_8ec2c1a12e25e563",
@@ -74477,7 +74477,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 677,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:03",
       "listings": [
         {
           "property_id": "fp_29b8e89689df8c1d",
@@ -81934,7 +81934,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 1419,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:03",
       "listings": [
         {
           "property_id": "fp_aac81b30755431fb",
@@ -97553,7 +97553,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 1400,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:03",
       "listings": [
         {
           "property_id": "fp_312742e7f6964ec2",
@@ -112963,7 +112963,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 1046,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:03",
       "listings": [
         {
           "property_id": "fp_9e65257f5203c96f",
@@ -124479,7 +124479,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 1129,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:04",
       "listings": [
         {
           "property_id": "fp_678c20440d182c20",
@@ -136908,7 +136908,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 1426,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:04",
       "listings": [
         {
           "property_id": "fp_fc601b8a912530d0",
@@ -152604,7 +152604,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 1408,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:04",
       "listings": [
         {
           "property_id": "fp_6fad7dfb10e0a0e6",
@@ -168102,7 +168102,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 775,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:04",
       "listings": [
         {
           "property_id": "fp_6a587cf6d63717f2",
@@ -176637,7 +176637,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 975,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:04",
       "listings": [
         {
           "property_id": "fp_f08e561048fae4fa",
@@ -187372,7 +187372,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 1114,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:04",
       "listings": [
         {
           "property_id": "fp_2f70543656c5a3f0",
@@ -199636,7 +199636,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 580,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:04",
       "listings": [
         {
           "property_id": "fp_ed2fef7b0dbb89ae",
@@ -206026,7 +206026,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 495,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:04",
       "listings": [
         {
           "property_id": "fp_31ed4da3d275480a",
@@ -211481,7 +211481,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 1164,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:04",
       "listings": [
         {
           "property_id": "fp_6ba6e41d1766fe46",
@@ -224295,7 +224295,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 947,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:04",
       "listings": [
         {
           "property_id": "fp_e6cfb403137920cc",
@@ -234722,7 +234722,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 1026,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:04",
       "listings": [
         {
           "property_id": "fp_e6569a2a1ccb4c99",
@@ -246018,7 +246018,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 583,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:04",
       "listings": [
         {
           "property_id": "fp_1cfd83dce4edd64b",
@@ -252441,7 +252441,7 @@
       "max_pages": 50,
       "enabled": true,
       "listing_count": 803,
-      "fetched_at": "2026-09-07T23:39:10",
+      "fetched_at": "2026-09-07T23:43:04",
       "listings": [
         {
           "property_id": "fp_b8c1dd6c29044747",

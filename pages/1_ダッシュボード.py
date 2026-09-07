@@ -25,12 +25,15 @@ st.caption(
     "下のボタンで最新 JSON を取り込み、表示は5分ごとに自動再読込します。"
 )
 
-remote_url = ""
-try:
-    remote_url = str(st.secrets.get("DAILY_PRICES_JSON_URL", "") or "").strip()
-except Exception:
-    remote_url = ""
-remote_url = resolve_remote_json_url(remote_url or None)
+
+def _secret_url() -> str:
+    try:
+        return str(st.secrets.get("DAILY_PRICES_JSON_URL", "") or "").strip()
+    except Exception:
+        return ""
+
+
+remote_url = resolve_remote_json_url(_secret_url() or None)
 
 sync_cols = st.columns([2, 1])
 sync_cols[0].caption(f"JSON: `{remote_url}`")
@@ -80,13 +83,16 @@ def render_dashboard(selected_config_id: int) -> None:
     history = price_history(selected_config_id)
     if history:
         st.subheader("平均価格の推移")
-        hist_df = pd.DataFrame(history, columns=["日付", "平均価格_万円"])
-        st.line_chart(hist_df.set_index("日付"))
+        hist_df = pd.DataFrame(history, columns=["日付", "平均価格_万円"]).set_index("日付")
+        if len(hist_df) == 1:
+            st.bar_chart(hist_df)
+        else:
+            st.line_chart(hist_df)
     else:
         st.caption("スナップショットがまだありません。")
 
     if diff is None:
-        st.warning("比較できるスナップショットが不足しています（2日分必要）。")
+        st.info("変動比較はスナップショットが2日分そろってから表示されます。")
     else:
         st.subheader("値下げ一覧")
         if diff.price_drops:

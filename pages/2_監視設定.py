@@ -25,15 +25,13 @@ init_db()
 
 st.title("監視設定")
 
-st.subheader("クラウド自動更新（推奨）")
+st.subheader("クラウド自動更新")
 st.markdown(
     """
-株分析Appと同じく、**GitHub Actions** が毎朝スクレイピングし、
-`data/published/daily_prices.json` を更新します。PCスリープの影響を受けません。
+**GitHub Actions** が毎朝スクレイピングし、
+`data/published/daily_prices.json` を更新します（PCスリープ不要・遅延は許容）。
 
-- Actions: `Daily SUUMO Price Scrape`
-- 既定スケジュール: 毎日 06:30 JST 目安（UTC 21:30）
-- 確実起動: cron-job.org などから `repository_dispatch`（`daily-price-scrape`）
+Actions ワークフロー名: `Daily SUUMO Price Scrape`
 """
 )
 
