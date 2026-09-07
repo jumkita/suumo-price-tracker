@@ -1,0 +1,85 @@
+# 株分析App (stock-daytrade) と同じ構成:
+# GitHub Actions が日次スクレイプ → JSON を commit/push → Streamlit が raw URL を読む
+name: Daily SUUMO Price Scrape
+
+on:
+  schedule:
+    # 21:30 UTC = 06:30 JST（遅延あり得る。確実起動は repository_dispatch を併用）
+    - cron: "30 21 * * *"
+  workflow_dispatch:
+    inputs:
+      max_pages:
+        description: "Max pages per ward"
+        required: false
+        default: "50"
+  repository_dispatch:
+    types: [daily-price-scrape]
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: write
+    env:
+      PRICES_DB_PATH: ${{ github.workspace }}/data/prices.db
+      MAX_PAGES: ${{ github.event.inputs.max_pages || '50' }}
+      REQUEST_INTERVAL: "2.0"
+      TZ: Asia/Tokyo
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Register Tokyo 23 wards
+        run: |
+          export PYTHONPATH="$GITHUB_WORKSPACE"
+          python scripts/register_wards.py --max-pages "${MAX_PAGES}"
+
+      - name: Scrape and store snapshots
+        run: |
+          export PYTHONPATH="$GITHUB_WORKSPACE"
+          python scripts/run_daily.py --interval "${REQUEST_INTERVAL}"
+
+      - name: Export published JSON
+        run: |
+          export PYTHONPATH="$GITHUB_WORKSPACE"
+          python scripts/export_published.py
+
+      - name: Commit and push published JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          TODAY_JST="$(TZ=Asia/Tokyo date +%F)"
+          TODAY_FILE="data/published/daily_prices_${TODAY_JST}.json"
+          LATEST_FILE="data/published/daily_prices.json"
+
+          git add "$LATEST_FILE" "$TODAY_FILE"
+
+          echo "=== staged ==="
+          git diff --staged --name-only
+
+          if ! git diff --staged --name-only | grep -Fx "$TODAY_FILE" >/dev/null; then
+            echo "ERROR: $TODAY_FILE is not staged"
+            exit 1
+          fi
+
+          if git diff --staged --quiet; then
+            echo "No content changes; skip commit"
+            exit 0
+          fi
+
+          git commit -m "chore: Update daily SUUMO prices ${TODAY_JST} [automated]"
+          git push

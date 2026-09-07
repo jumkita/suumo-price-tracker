@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+data/prices.db
+data/logs/
+data/scrape_*.log
+.streamlit/secrets.toml
+*.log
