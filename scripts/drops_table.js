@@ -17,15 +17,15 @@
   }
 
   function applyFilters() {
-    var inputs = table.querySelectorAll("input[data-filter]");
+    var inputs = table.querySelectorAll("select[data-filter]");
     var shown = 0;
     Array.prototype.forEach.call(body.rows, function (row) {
       var visible = true;
       Array.prototype.forEach.call(inputs, function (input) {
-        var needle = (input.value || "").trim().toLowerCase();
+        var needle = input.value || "";
         if (!needle) return;
-        var hay = (row.getAttribute("data-" + input.getAttribute("data-filter")) || "").toLowerCase();
-        if (hay.indexOf(needle) === -1) visible = false;
+        var hay = row.getAttribute("data-" + input.getAttribute("data-filter")) || "";
+        if (hay !== needle) visible = false;
       });
       row.hidden = !visible;
       if (visible) shown += 1;
@@ -61,8 +61,8 @@
       sortBy(th.getAttribute("data-key"), th.getAttribute("data-type") || "text");
     });
   });
-  Array.prototype.forEach.call(table.querySelectorAll("input[data-filter]"), function (input) {
-    input.addEventListener("input", applyFilters);
+  Array.prototype.forEach.call(table.querySelectorAll("select[data-filter]"), function (input) {
+    input.addEventListener("change", applyFilters);
   });
   applyFilters();
 })();

@@ -25,6 +25,7 @@ class PriceChange:
     layout: str = ""
     floor: str = ""
     ward_name: str = ""
+    built_year: str = ""
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,7 @@ def _to_change(
         layout=curr.layout,
         floor=curr.floor or "",
         ward_name=ward_name,
+        built_year=curr.built_year or "",
     )
 
 

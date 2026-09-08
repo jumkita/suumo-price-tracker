@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.listing_display import price_band, ward_label
+from src.listing_display import format_built_age, price_band, ward_label
 
 
 def test_ward_label_strips_watch_suffix() -> None:
@@ -19,3 +19,10 @@ def test_price_band_uses_new_price_thresholds() -> None:
     assert price_band(8000) == "8000万〜1億円"
     assert price_band(15000) == "1億〜2億円"
     assert price_band(20000) == "2億円〜"
+
+
+def test_format_built_age_uses_snapshot_year() -> None:
+    assert format_built_age("2010年1月", "2026-09-08") == "築16年"
+    assert format_built_age("2010年", "2026-09-08") == "築16年"
+    assert format_built_age("", "2026-09-08") == "-"
+    assert format_built_age("2010年", "") == "2010年"

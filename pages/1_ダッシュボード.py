@@ -20,7 +20,7 @@ from src.db import (
     list_watch_configs,
 )
 from src.diff import compare_listings, format_man
-from src.listing_display import price_band, ward_label
+from src.listing_display import format_built_age, price_band, ward_label
 from src.listing_fields import parse_station_name, parse_walk_minutes
 from src.property_history import (
     PricePoint,
@@ -122,6 +122,12 @@ def render_dashboard() -> None:
     col3.metric("値下げ（全区）", len(drops))
 
     st.subheader("値下げ一覧（全区横断）")
+    snapshot_date = ""
+    for config in configs:
+        snaps = list_snapshots(config.id)
+        if snaps:
+            snapshot_date = snaps[0].snapshot_date
+            break
     if drops:
         drop_df = pd.DataFrame(
             [
@@ -144,26 +150,27 @@ def render_dashboard() -> None:
                     else parse_walk_minutes(item.station),
                     "面積": item.area_sqm,
                     "間取り": item.layout or "-",
+                    "築年数": format_built_age(item.built_year, snapshot_date),
                     "階数": item.floor or "-",
                     "URL": item.url,
                 }
                 for item in drops
             ]
         )
+        all_label = "（すべて）"
         with st.expander("列で絞り込み", expanded=True):
             filter_cols = st.columns(4)
             filtered = drop_df
             column_names = list(drop_df.columns)
             for index, column in enumerate(column_names):
-                query = filter_cols[index % 4].text_input(
-                    column, key=f"drop_filter_{column}"
+                choices = [all_label] + sorted(
+                    drop_df[column].dropna().astype(str).unique().tolist()
                 )
-                if query:
-                    filtered = filtered[
-                        filtered[column]
-                        .astype(str)
-                        .str.contains(query, case=False, na=False)
-                    ]
+                query = filter_cols[index % 4].selectbox(
+                    column, choices, key=f"drop_filter_{column}"
+                )
+                if query != all_label:
+                    filtered = filtered[filtered[column].astype(str) == query]
         st.caption(f"表示 {len(filtered)} / {len(drop_df)}件。列名クリックでソートできます。")
         st.dataframe(
             filtered,

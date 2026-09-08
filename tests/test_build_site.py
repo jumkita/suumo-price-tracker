@@ -91,3 +91,7 @@ def test_build_site_writes_index(tmp_path: Path) -> None:
     assert "data-filter=" in html
     assert "data-key=" in html
     assert "drops-table" in html
+    assert "築16年" in html
+    assert "<select" in html
+    assert 'input type="search"' not in html
+    assert "すべて" in html
