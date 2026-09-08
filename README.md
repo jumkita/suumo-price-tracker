@@ -34,7 +34,7 @@ DAILY_PRICES_JSON_URL = "https://raw.githubusercontent.com/jumkita/suumo-price-t
 ## 画面での確認（Streamlit）
 
 1. ダッシュボードの **「最新データを読み込み」** でクラウドJSONを取込
-2. 全区の値下げ一覧と、物件ごとの過去価格を確認（文字検索・1000万円/徒歩/面積の絞り込み、昇順降順）
+2. 全区の値下げ一覧と、物件ごとの過去価格を確認（文字検索・1000万円/徒歩/面積の絞り込み、昇順降順）。更新のたびに「今日の読み取り」が出ます
 3. X投稿下書きで投稿文をコピー
 
 ## クラウド自動更新
@@ -49,7 +49,8 @@ DAILY_PRICES_JSON_URL = "https://raw.githubusercontent.com/jumkita/suumo-price-t
 - `data/published/daily_prices.json`（最新）
 - `data/published/daily_prices_YYYY-MM-DD.json`（日付別。過去分は削除せず蓄積）
 - `data/published/price_history.json`（件数・平均の軽量サマリ。画面では使わない）
-- `site/index.html`（Pages用・Actionsで生成）
+- `data/published/daily_insight.json` / `daily_insight.md`（その日の値下げの読み取り）
+- `site/index.html`（Pages用・Actionsで生成。先頭に同じ読み取りを掲載）
 
 ### ローカル手動
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -18,6 +19,11 @@ from src.db import (
     listing_price_histories,
     list_snapshots,
     list_watch_configs,
+)
+from src.daily_insight import (
+    build_daily_insight,
+    insight_to_dict,
+    previous_payload,
 )
 from src.diff import compare_listings, format_man
 from src.listing_display import (
@@ -97,6 +103,19 @@ def load_citywide_drops():
     return drops
 
 
+def load_daily_insight() -> dict | None:
+    publish_dir = ROOT / "data" / "published"
+    stored = publish_dir / "daily_insight.json"
+    if stored.exists():
+        return json.loads(stored.read_text(encoding="utf-8"))
+    latest = publish_dir / "daily_prices.json"
+    if not latest.exists():
+        return None
+    current = json.loads(latest.read_text(encoding="utf-8"))
+    previous = previous_payload(publish_dir, str(current.get("snapshot_date") or ""))
+    return insight_to_dict(build_daily_insight(current, previous))
+
+
 def load_histories():
     publish_dir = ROOT / "data" / "published"
     dated = list(publish_dir.glob("daily_prices_????-??-??.json"))
@@ -127,6 +146,14 @@ def render_dashboard() -> None:
             total_listings += snaps[0].listing_count
     col2.metric("最新件数（合計）", total_listings)
     col3.metric("値下げ（全区）", len(drops))
+
+    insight = load_daily_insight()
+    if insight:
+        st.subheader("今日の読み取り")
+        st.caption(
+            f"{insight.get('previous_date') or '-'} → {insight.get('snapshot_date') or '-'}"
+        )
+        st.markdown(insight.get("markdown") or "")
 
     st.subheader("値下げ一覧（全区横断）")
     snapshot_date = ""

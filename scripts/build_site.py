@@ -15,7 +15,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.citywide import citywide_price_drops
+from src.citywide import CitywideComparison, compare_citywide
+from src.daily_insight import build_daily_insight, render_insight_html
 from src.diff import DiffResult, PriceChange, format_man
 from src.listing_display import (
     WALK_FILTERS,
@@ -325,6 +326,7 @@ def render_html(
     previous: dict | None,
     drops: list[PriceChange],
     histories: dict[str, list[PricePoint]],
+    comparison: CitywideComparison | None = None,
 ) -> str:
     snapshot_date = current.get("snapshot_date", "-")
     generated_at = current.get("generated_at", "-")
@@ -333,6 +335,8 @@ def render_html(
     day = str(snapshot_date)
     filter_row = _filter_row(_filter_options(drops, histories, day))
     drop_rows = _drop_rows(drops, histories, day)
+    insight = build_daily_insight(current, previous, comparison)
+    insight_html = render_insight_html(insight)
 
     summary_diff = DiffResult(
         price_drops=drops,
@@ -485,6 +489,45 @@ def render_html(
       background: #fff;
     }}
     a {{ color: var(--accent); }}
+    .insight-headline {{
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 0.35rem 0 0.6rem;
+    }}
+    .insight h3 {{
+      font-size: 0.92rem;
+      margin: 1rem 0 0.4rem;
+    }}
+    .insight ul {{
+      margin: 0;
+      padding-left: 1.15rem;
+    }}
+    .insight-note {{
+      color: var(--muted);
+      font-size: 0.86rem;
+      margin: 0.75rem 0 0;
+    }}
+    .insight-bar {{
+      margin: 0.35rem 0 0.55rem;
+    }}
+    .insight-bar-label {{
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 0.15rem;
+    }}
+    .insight-bar-track {{
+      display: block;
+      height: 8px;
+      background: #f3eee5;
+      border-radius: 999px;
+      overflow: hidden;
+    }}
+    .insight-bar-fill {{
+      display: block;
+      height: 100%;
+      background: var(--accent);
+    }}
     footer {{
       text-align: center;
       color: var(--muted);
@@ -511,6 +554,8 @@ def render_html(
         <div><span class="label">更新日</span><strong>{_escape(snapshot_date)}</strong></div>
       </div>
     </section>
+
+    {insight_html}
 
     <section class="card">
       <h2>X投稿下書き（23区まとめて）</h2>
@@ -561,14 +606,15 @@ def build_site(
         previous = _load(publish_dir / f"daily_prices_{prev_day}.json")
 
     histories = build_property_histories(publish_dir)
-    drops = citywide_price_drops(latest, previous)
+    comparison = compare_citywide(latest, previous)
+    drops = comparison.drops if comparison is not None else []
     if enrich_floor:
         drops = enrich_floors(drops)
 
     site_dir.mkdir(parents=True, exist_ok=True)
     index = site_dir / "index.html"
     index.write_text(
-        render_html(latest, previous, drops, histories),
+        render_html(latest, previous, drops, histories, comparison),
         encoding="utf-8",
     )
 

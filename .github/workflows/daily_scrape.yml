@@ -55,10 +55,14 @@ jobs:
           TODAY_FILE="data/published/daily_prices_${TODAY_JST}.json"
           LATEST_FILE="data/published/daily_prices.json"
           HISTORY_FILE="data/published/price_history.json"
+          INSIGHT_JSON="data/published/daily_insight.json"
+          INSIGHT_MD="data/published/daily_insight.md"
 
           test -f "$TODAY_FILE"
           test -f "$LATEST_FILE"
           test -f "$HISTORY_FILE"
+          test -f "$INSIGHT_JSON"
+          test -f "$INSIGHT_MD"
 
           COUNT="$(python -c "import json; print(json.load(open('$LATEST_FILE', encoding='utf-8'))['listing_count'])")"
           echo "published_listing_count=${COUNT}"
@@ -71,6 +75,8 @@ jobs:
           git add data/published/daily_prices.json
           git add data/published/daily_prices_*.json
           git add "$HISTORY_FILE"
+          git add "$INSIGHT_JSON"
+          git add "$INSIGHT_MD"
 
           echo "=== staged ==="
           git diff --staged --name-only

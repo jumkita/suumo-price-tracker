@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from src.daily_insight import previous_payload, write_insight_files
 from src.history import write_history
 from src.publish import DEFAULT_PUBLISH_DIR, publish_daily
 
@@ -31,11 +32,14 @@ def main() -> int:
         publish_dir=publish_dir,
     )
     history_path = write_history(publish_dir)
+    previous = previous_payload(publish_dir, str(payload["snapshot_date"]))
+    insight_json, insight_md = write_insight_files(publish_dir, payload, previous)
     print(
         f"wrote {dated} and {latest} "
         f"(configs={payload['config_count']} listings={payload['listing_count']})"
     )
     print(f"wrote {history_path}")
+    print(f"wrote {insight_json} and {insight_md}")
     return 0
 
 

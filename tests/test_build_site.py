@@ -107,6 +107,8 @@ def test_build_site_writes_index(tmp_path: Path) -> None:
     assert "昇順" in html
     assert "降順" in html
     assert "すべて" in html
+    assert "今日の読み取り" in html
+    assert "値下げが広め" in html
 
 
 def test_filter_options_sort_price_and_area_numerically() -> None:
