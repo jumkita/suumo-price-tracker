@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 from typing import Iterator
 
+from src.scraper.suumo import listing_key
+
 _DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "prices.db"
 
 
@@ -417,3 +419,33 @@ def citywide_average_price_by_date(
         for row in rows
         if row["avg_price"] is not None
     ]
+
+
+def listing_price_histories(
+    db_path: Path | None = None,
+) -> dict[str, list[tuple[str, int | None, str, str]]]:
+    """Map listing key -> [(date, price, name, url), ...] from all snapshots."""
+    with get_connection(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT s.snapshot_date AS d, l.price_man, l.name, l.url, l.property_id
+            FROM listings l
+            JOIN snapshots s ON s.id = l.snapshot_id
+            ORDER BY s.snapshot_date
+            """
+        ).fetchall()
+    histories: dict[str, list[tuple[str, int | None, str, str]]] = {}
+    seen: dict[str, set[str]] = {}
+    for row in rows:
+        key = listing_key(row["url"] or "", row["property_id"] or "")
+        if not key:
+            continue
+        day = row["d"]
+        used = seen.setdefault(key, set())
+        if day in used:
+            continue
+        used.add(day)
+        histories.setdefault(key, []).append(
+            (day, row["price_man"], row["name"] or "", row["url"] or "")
+        )
+    return histories

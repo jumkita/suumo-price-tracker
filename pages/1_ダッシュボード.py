@@ -12,16 +12,21 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.db import (
-    citywide_average_price_by_date,
     get_latest_two_snapshots,
     get_listings_for_snapshot,
     init_db,
+    listing_price_histories,
     list_snapshots,
     list_watch_configs,
 )
 from src.diff import compare_listings, format_man
 from src.listing_fields import parse_station_name, parse_walk_minutes
-from src.pipeline import load_diff_for_config, price_history
+from src.property_history import (
+    PricePoint,
+    build_property_histories,
+    format_price_history,
+    history_for_listing,
+)
 from src.remote_sync import resolve_remote_json_url, sync_from_remote
 
 st.set_page_config(page_title="ダッシュボード", page_icon="📊", layout="wide")
@@ -30,7 +35,7 @@ init_db()
 st.title("ダッシュボード")
 st.caption(
     "データは GitHub Actions が日次更新します。"
-    "値下げは行政区を分けず一覧表示します。"
+    "値下げは行政区を分けず、物件ごとの過去価格をすべて表示します。"
 )
 
 
@@ -84,10 +89,26 @@ def load_citywide_drops():
     return drops
 
 
+def load_histories():
+    publish_dir = ROOT / "data" / "published"
+    dated = list(publish_dir.glob("daily_prices_????-??-??.json"))
+    if dated:
+        return build_property_histories(publish_dir)
+    raw = listing_price_histories()
+    converted = {}
+    for key, points in raw.items():
+        converted[key] = [
+            PricePoint(day, price, name, url, "")
+            for day, price, name, url in points
+        ]
+    return converted
+
+
 @st.fragment(run_every=timedelta(minutes=5))
 def render_dashboard() -> None:
     st.caption(f"表示更新: {datetime.now():%Y-%m-%d %H:%M:%S}")
     drops = load_citywide_drops()
+    histories = load_histories()
 
     col1, col2, col3 = st.columns(3)
     col1.metric("監視区数", len(configs))
@@ -99,26 +120,15 @@ def render_dashboard() -> None:
     col2.metric("最新件数（合計）", total_listings)
     col3.metric("値下げ（全区）", len(drops))
 
-    city_hist = citywide_average_price_by_date()
-    if city_hist:
-        st.subheader("平均価格の推移（全区・過去分を保持）")
-        hist_df = pd.DataFrame(
-            city_hist,
-            columns=["日付", "平均価格_万円", "件数"],
-        )
-        chart_df = hist_df.set_index("日付")[["平均価格_万円"]]
-        if len(chart_df) == 1:
-            st.bar_chart(chart_df)
-        else:
-            st.line_chart(chart_df)
-        st.dataframe(hist_df, use_container_width=True, hide_index=True)
-
     st.subheader("値下げ一覧（全区横断）")
     if drops:
         drop_df = pd.DataFrame(
             [
                 {
                     "物件名": item.name,
+                    "価格履歴": format_price_history(
+                        history_for_listing(histories, item.url, item.property_id)
+                    ),
                     "旧価格": format_man(item.old_price_man),
                     "新価格": format_man(item.new_price_man),
                     "差額": format_man(item.delta_man),
@@ -146,34 +156,6 @@ def render_dashboard() -> None:
         st.dataframe(drop_df, use_container_width=True, hide_index=True)
     else:
         st.write("値下げはありません。")
-
-    st.subheader("区ごとの参考指標")
-    labels = {f"{c.id}: {c.name}": c.id for c in configs}
-    selected_label = st.selectbox("監視対象", list(labels.keys()))
-    config_id = labels[selected_label]
-    _, diff, current_avg, previous_avg = load_diff_for_config(config_id)
-    snaps = list_snapshots(config_id)
-
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("最新件数", snaps[0].listing_count if snaps else 0)
-    m2.metric("値下げ", diff.drop_count if diff else 0)
-    m3.metric("新規", diff.new_count if diff else 0)
-    avg_delta = None
-    if current_avg is not None and previous_avg is not None:
-        avg_delta = round(current_avg - previous_avg, 1)
-    m4.metric(
-        "平均価格（万円）",
-        f"{current_avg:.0f}" if current_avg is not None else "-",
-        f"{avg_delta:+.0f}" if avg_delta is not None else None,
-    )
-
-    history = price_history(config_id)
-    if history:
-        hist_df = pd.DataFrame(history, columns=["日付", "平均価格_万円"]).set_index("日付")
-        if len(hist_df) == 1:
-            st.bar_chart(hist_df)
-        else:
-            st.line_chart(hist_df)
 
 
 render_dashboard()

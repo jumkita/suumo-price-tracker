@@ -103,6 +103,14 @@ def extract_property_id(href: str) -> str | None:
     return None
 
 
+def listing_key(url: str, property_id: str = "") -> str:
+    """Stable listing identity. Prefer SUUMO nc_ ID so name edits do not break history."""
+    extracted = extract_property_id(url or "")
+    if extracted:
+        return f"nc_{extracted}"
+    return (property_id or url or "").strip()
+
+
 def absolute_url(href: str) -> str:
     if href.startswith("http"):
         return href

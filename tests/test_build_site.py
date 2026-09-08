@@ -81,5 +81,7 @@ def test_build_site_writes_index(tmp_path: Path) -> None:
     assert "2LDK" in html
     assert "3階" in html
     assert "viewport" in html
-    assert "平均価格の推移" in html
-    assert "polyline" in html
+    assert "価格履歴" in html
+    assert "2026-09-07 5000万円" in html
+    assert "2026-09-08 4800万円" in html
+    assert "平均価格の推移" not in html

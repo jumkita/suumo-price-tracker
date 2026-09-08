@@ -48,6 +48,40 @@ def test_compare_listings_detects_drop_rise_new_removed() -> None:
     assert diff.removed_listings[0].property_id == "3"
 
 
+def test_compare_listings_follows_nc_id_when_fingerprint_changes() -> None:
+    previous = [
+        ListingRow(
+            property_id="fp_old",
+            name="キャッチコピー",
+            address="東京都千代田区",
+            price_man=5000,
+            area_sqm=60.0,
+            layout="2LDK",
+            built_year="2010年1月",
+            station="半蔵門",
+            url="https://suumo.jp/ms/chuko/tokyo/sc_chiyoda/nc_21351233/",
+        )
+    ]
+    current = [
+        ListingRow(
+            property_id="fp_new",
+            name="テストマンション",
+            address="東京都千代田区",
+            price_man=4800,
+            area_sqm=60.0,
+            layout="2LDK",
+            built_year="2010年1月",
+            station="半蔵門",
+            url="https://suumo.jp/ms/chuko/tokyo/sc_chiyoda/nc_21351233/",
+        )
+    ]
+    diff = compare_listings(previous, current)
+    assert diff.drop_count == 1
+    assert diff.price_drops[0].delta_man == -200
+    assert diff.new_count == 0
+    assert diff.removed_count == 0
+
+
 def test_compare_listings_unchanged() -> None:
     previous = [_listing("1", "A", 5000)]
     current = [_listing("1", "A", 5000)]

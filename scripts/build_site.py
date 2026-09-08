@@ -17,8 +17,13 @@ if str(ROOT) not in sys.path:
 
 from src.citywide import citywide_price_drops
 from src.diff import DiffResult, PriceChange, format_man
-from src.history import build_history, svg_avg_price_chart
 from src.listing_fields import parse_floor_from_detail_html
+from src.property_history import (
+    PricePoint,
+    build_property_histories,
+    format_price_history,
+    history_for_listing,
+)
 from src.scraper.suumo import default_fetch
 from src.tweet_draft import build_tweet_draft
 
@@ -84,14 +89,19 @@ def enrich_floors(
     return enriched
 
 
-def _drop_rows(drops: list[PriceChange]) -> str:
+def _drop_rows(
+    drops: list[PriceChange],
+    histories: dict[str, list[PricePoint]],
+) -> str:
     if not drops:
-        return "<tr><td colspan='10'>値下げはありません</td></tr>"
+        return "<tr><td colspan='11'>値下げはありません</td></tr>"
     rows = []
     for item in drops:
+        points = history_for_listing(histories, item.url, item.property_id)
         rows.append(
             "<tr>"
             f"<td>{_escape(item.name)}</td>"
+            f"<td>{_escape(format_price_history(points))}</td>"
             f"<td>{_escape(format_man(item.old_price_man))}</td>"
             f"<td>{_escape(format_man(item.new_price_man))}</td>"
             f"<td>{_escape(format_man(item.delta_man))}</td>"
@@ -106,28 +116,11 @@ def _drop_rows(drops: list[PriceChange]) -> str:
     return "".join(rows)
 
 
-def _history_rows(points: list[dict]) -> str:
-    if not points:
-        return "<tr><td colspan='3'>履歴はまだありません</td></tr>"
-    rows = []
-    for point in reversed(points):
-        avg = point.get("avg_price_man")
-        avg_text = f"{avg:.0f}万円" if avg is not None else "-"
-        rows.append(
-            "<tr>"
-            f"<td>{_escape(point.get('snapshot_date'))}</td>"
-            f"<td>{_escape(point.get('listing_count'))}</td>"
-            f"<td>{_escape(avg_text)}</td>"
-            "</tr>"
-        )
-    return "".join(rows)
-
-
 def render_html(
     current: dict,
     previous: dict | None,
     drops: list[PriceChange],
-    history_points: list[dict],
+    histories: dict[str, list[PricePoint]],
 ) -> str:
     snapshot_date = current.get("snapshot_date", "-")
     generated_at = current.get("generated_at", "-")
@@ -142,12 +135,6 @@ def render_html(
         unchanged_count=0,
     )
     draft = build_tweet_draft("東京23区", summary_diff)
-    chart = svg_avg_price_chart(history_points)
-    chart_block = (
-        f'<div class="chart">{chart}</div>'
-        if chart
-        else '<p class="sub">推移を表示するには2日分以上必要です。</p>'
-    )
 
     return f"""<!DOCTYPE html>
 <html lang="ja">
@@ -202,7 +189,6 @@ def render_html(
       padding: 0.55rem 0.6rem;
     }}
     .metrics .label {{ display: block; color: var(--muted); font-size: 0.72rem; }}
-    .chart {{ margin: 0.5rem 0 0.75rem; }}
     .draft {{
       white-space: pre-wrap;
       background: #1c1a17;
@@ -254,34 +240,22 @@ def render_html(
     </section>
 
     <section class="card">
-      <h2>平均価格の推移</h2>
-      <p class="sub">過去の日次スナップショットは残したまま、全区平均を追います。</p>
-      {chart_block}
-      <div class="table-wrap"><table>
-        <thead><tr><th>日付</th><th>件数</th><th>平均価格</th></tr></thead>
-        <tbody>
-          {_history_rows(history_points)}
-        </tbody>
-      </table></div>
-    </section>
-
-    <section class="card">
       <h2>X投稿下書き（23区まとめて）</h2>
       <pre class="draft">{_escape(draft)}</pre>
     </section>
 
     <section class="card">
       <h2>値下げ一覧（全区横断）</h2>
-      <p class="sub">行政区を分けず、値下げ額が大きい順に表示します。</p>
+      <p class="sub">行政区を分けず、値下げ額が大きい順です。価格履歴は保存済みの日付をすべて出します（平均は使いません）。</p>
       <div class="table-wrap"><table>
         <thead>
           <tr>
-            <th>物件名</th><th>旧価格</th><th>新価格</th><th>差額</th>
+            <th>物件名</th><th>価格履歴</th><th>旧価格</th><th>新価格</th><th>差額</th>
             <th>最寄り駅</th><th>駅徒歩</th><th>面積</th><th>間取り</th><th>階数</th><th>リンク</th>
           </tr>
         </thead>
         <tbody>
-          {_drop_rows(drops)}
+          {_drop_rows(drops, histories)}
         </tbody>
       </table></div>
     </section>
@@ -311,7 +285,7 @@ def build_site(
         prev_day = (date.fromisoformat(snapshot_date) - timedelta(days=1)).isoformat()
         previous = _load(publish_dir / f"daily_prices_{prev_day}.json")
 
-    history = build_history(publish_dir)
+    histories = build_property_histories(publish_dir)
     drops = citywide_price_drops(latest, previous)
     if enrich_floor:
         drops = enrich_floors(drops)
@@ -319,7 +293,7 @@ def build_site(
     site_dir.mkdir(parents=True, exist_ok=True)
     index = site_dir / "index.html"
     index.write_text(
-        render_html(latest, previous, drops, history.get("points") or []),
+        render_html(latest, previous, drops, histories),
         encoding="utf-8",
     )
 
@@ -327,10 +301,6 @@ def build_site(
     data_dir.mkdir(exist_ok=True)
     (data_dir / "daily_prices.json").write_text(
         json.dumps(latest, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    (data_dir / "price_history.json").write_text(
-        json.dumps(history, ensure_ascii=False),
         encoding="utf-8",
     )
     if previous is not None:

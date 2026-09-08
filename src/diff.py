@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from src.db import ListingRow
 from src.listing_fields import parse_station_name, parse_walk_minutes
+from src.scraper.suumo import listing_key
 
 
 @dataclass(frozen=True)
@@ -91,15 +92,15 @@ def compare_listings(
     *,
     ward_name: str = "",
 ) -> DiffResult:
-    prev_map = {item.property_id: item for item in previous}
-    curr_map = {item.property_id: item for item in current}
+    prev_map = {listing_key(item.url, item.property_id): item for item in previous}
+    curr_map = {listing_key(item.url, item.property_id): item for item in current}
 
     drops: list[PriceChange] = []
     rises: list[PriceChange] = []
     unchanged = 0
 
-    for property_id, curr in curr_map.items():
-        prev = prev_map.get(property_id)
+    for key, curr in curr_map.items():
+        prev = prev_map.get(key)
         if prev is None:
             continue
         delta = _delta(prev.price_man, curr.price_man)
@@ -121,12 +122,8 @@ def compare_listings(
         )
     )
 
-    new_listings = [
-        curr for property_id, curr in curr_map.items() if property_id not in prev_map
-    ]
-    removed_listings = [
-        prev for property_id, prev in prev_map.items() if property_id not in curr_map
-    ]
+    new_listings = [curr for key, curr in curr_map.items() if key not in prev_map]
+    removed_listings = [prev for key, prev in prev_map.items() if key not in curr_map]
     new_listings.sort(key=lambda item: item.name)
     removed_listings.sort(key=lambda item: item.name)
 
