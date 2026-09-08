@@ -394,3 +394,26 @@ def average_price_by_date(
             (config_id,),
         ).fetchall()
     return [(row["d"], float(row["avg_price"])) for row in rows if row["avg_price"] is not None]
+
+
+def citywide_average_price_by_date(
+    db_path: Path | None = None,
+) -> list[tuple[str, float, int]]:
+    with get_connection(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT s.snapshot_date AS d,
+                   AVG(l.price_man) AS avg_price,
+                   COUNT(l.id) AS listing_count
+            FROM snapshots s
+            JOIN listings l ON l.snapshot_id = s.id
+            WHERE l.price_man IS NOT NULL
+            GROUP BY s.snapshot_date
+            ORDER BY s.snapshot_date
+            """
+        ).fetchall()
+    return [
+        (row["d"], float(row["avg_price"]), int(row["listing_count"]))
+        for row in rows
+        if row["avg_price"] is not None
+    ]

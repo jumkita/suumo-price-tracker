@@ -143,17 +143,19 @@ def sync_from_remote(
     result = import_payload(payload, db_path=db_path)
 
     if also_previous_day:
-        # Best-effort: import previous dated file when present for diffs.
+        # Import archived dated snapshots so local charts keep full history.
         from datetime import timedelta
 
         day = date.fromisoformat(result.snapshot_date)
-        prev = (day - timedelta(days=1)).isoformat()
-        prev_url = dated_url_for(target, prev)
-        try:
-            prev_payload = fetch_json(prev_url)
-            import_payload(prev_payload, db_path=db_path)
-        except Exception:
-            pass
+        for offset in range(1, 60):
+            prev = (day - timedelta(days=offset)).isoformat()
+            prev_url = dated_url_for(target, prev)
+            try:
+                prev_payload = fetch_json(prev_url)
+                import_payload(prev_payload, db_path=db_path)
+            except Exception:
+                if offset >= 3:
+                    break
 
     return SyncResult(
         source_url=target,

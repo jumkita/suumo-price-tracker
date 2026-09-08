@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.db import (
+    citywide_average_price_by_date,
     get_latest_two_snapshots,
     get_listings_for_snapshot,
     init_db,
@@ -97,6 +98,20 @@ def render_dashboard() -> None:
             total_listings += snaps[0].listing_count
     col2.metric("最新件数（合計）", total_listings)
     col3.metric("値下げ（全区）", len(drops))
+
+    city_hist = citywide_average_price_by_date()
+    if city_hist:
+        st.subheader("平均価格の推移（全区・過去分を保持）")
+        hist_df = pd.DataFrame(
+            city_hist,
+            columns=["日付", "平均価格_万円", "件数"],
+        )
+        chart_df = hist_df.set_index("日付")[["平均価格_万円"]]
+        if len(chart_df) == 1:
+            st.bar_chart(chart_df)
+        else:
+            st.line_chart(chart_df)
+        st.dataframe(hist_df, use_container_width=True, hide_index=True)
 
     st.subheader("値下げ一覧（全区横断）")
     if drops:

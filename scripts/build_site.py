@@ -16,11 +16,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.citywide import citywide_price_drops
-from src.diff import PriceChange, format_man
+from src.diff import DiffResult, PriceChange, format_man
+from src.history import build_history, svg_avg_price_chart
 from src.listing_fields import parse_floor_from_detail_html
 from src.scraper.suumo import default_fetch
 from src.tweet_draft import build_tweet_draft
-from src.diff import DiffResult
 
 PUBLISH_DIR = ROOT / "data" / "published"
 SITE_DIR = ROOT / "site"
@@ -106,7 +106,29 @@ def _drop_rows(drops: list[PriceChange]) -> str:
     return "".join(rows)
 
 
-def render_html(current: dict, previous: dict | None, drops: list[PriceChange]) -> str:
+def _history_rows(points: list[dict]) -> str:
+    if not points:
+        return "<tr><td colspan='3'>履歴はまだありません</td></tr>"
+    rows = []
+    for point in reversed(points):
+        avg = point.get("avg_price_man")
+        avg_text = f"{avg:.0f}万円" if avg is not None else "-"
+        rows.append(
+            "<tr>"
+            f"<td>{_escape(point.get('snapshot_date'))}</td>"
+            f"<td>{_escape(point.get('listing_count'))}</td>"
+            f"<td>{_escape(avg_text)}</td>"
+            "</tr>"
+        )
+    return "".join(rows)
+
+
+def render_html(
+    current: dict,
+    previous: dict | None,
+    drops: list[PriceChange],
+    history_points: list[dict],
+) -> str:
     snapshot_date = current.get("snapshot_date", "-")
     generated_at = current.get("generated_at", "-")
     listing_count = current.get("listing_count", 0)
@@ -120,6 +142,12 @@ def render_html(current: dict, previous: dict | None, drops: list[PriceChange]) 
         unchanged_count=0,
     )
     draft = build_tweet_draft("東京23区", summary_diff)
+    chart = svg_avg_price_chart(history_points)
+    chart_block = (
+        f'<div class="chart">{chart}</div>'
+        if chart
+        else '<p class="sub">推移を表示するには2日分以上必要です。</p>'
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="ja">
@@ -174,6 +202,7 @@ def render_html(current: dict, previous: dict | None, drops: list[PriceChange]) 
       padding: 0.55rem 0.6rem;
     }}
     .metrics .label {{ display: block; color: var(--muted); font-size: 0.72rem; }}
+    .chart {{ margin: 0.5rem 0 0.75rem; }}
     .draft {{
       white-space: pre-wrap;
       background: #1c1a17;
@@ -225,6 +254,18 @@ def render_html(current: dict, previous: dict | None, drops: list[PriceChange]) 
     </section>
 
     <section class="card">
+      <h2>平均価格の推移</h2>
+      <p class="sub">過去の日次スナップショットは残したまま、全区平均を追います。</p>
+      {chart_block}
+      <div class="table-wrap"><table>
+        <thead><tr><th>日付</th><th>件数</th><th>平均価格</th></tr></thead>
+        <tbody>
+          {_history_rows(history_points)}
+        </tbody>
+      </table></div>
+    </section>
+
+    <section class="card">
       <h2>X投稿下書き（23区まとめて）</h2>
       <pre class="draft">{_escape(draft)}</pre>
     </section>
@@ -270,18 +311,26 @@ def build_site(
         prev_day = (date.fromisoformat(snapshot_date) - timedelta(days=1)).isoformat()
         previous = _load(publish_dir / f"daily_prices_{prev_day}.json")
 
+    history = build_history(publish_dir)
     drops = citywide_price_drops(latest, previous)
     if enrich_floor:
         drops = enrich_floors(drops)
 
     site_dir.mkdir(parents=True, exist_ok=True)
     index = site_dir / "index.html"
-    index.write_text(render_html(latest, previous, drops), encoding="utf-8")
+    index.write_text(
+        render_html(latest, previous, drops, history.get("points") or []),
+        encoding="utf-8",
+    )
 
     data_dir = site_dir / "data"
     data_dir.mkdir(exist_ok=True)
     (data_dir / "daily_prices.json").write_text(
         json.dumps(latest, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (data_dir / "price_history.json").write_text(
+        json.dumps(history, ensure_ascii=False),
         encoding="utf-8",
     )
     if previous is not None:

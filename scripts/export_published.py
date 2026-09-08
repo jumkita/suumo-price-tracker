@@ -12,7 +12,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.publish import publish_daily
+from src.history import write_history
+from src.publish import DEFAULT_PUBLISH_DIR, publish_daily
 
 
 def main() -> int:
@@ -23,15 +24,18 @@ def main() -> int:
     args = parser.parse_args()
 
     snapshot_date = date.fromisoformat(args.date) if args.date else None
+    publish_dir = args.out_dir or DEFAULT_PUBLISH_DIR
     dated, latest, payload = publish_daily(
         snapshot_date=snapshot_date,
         db_path=args.db,
-        publish_dir=args.out_dir,
+        publish_dir=publish_dir,
     )
+    history_path = write_history(publish_dir)
     print(
         f"wrote {dated} and {latest} "
         f"(configs={payload['config_count']} listings={payload['listing_count']})"
     )
+    print(f"wrote {history_path}")
     return 0
 
 

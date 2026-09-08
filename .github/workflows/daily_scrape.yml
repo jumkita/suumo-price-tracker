@@ -54,9 +54,11 @@ jobs:
           TODAY_JST="$(TZ=Asia/Tokyo date +%F)"
           TODAY_FILE="data/published/daily_prices_${TODAY_JST}.json"
           LATEST_FILE="data/published/daily_prices.json"
+          HISTORY_FILE="data/published/price_history.json"
 
           test -f "$TODAY_FILE"
           test -f "$LATEST_FILE"
+          test -f "$HISTORY_FILE"
 
           COUNT="$(python -c "import json; print(json.load(open('$LATEST_FILE', encoding='utf-8'))['listing_count'])")"
           echo "published_listing_count=${COUNT}"
@@ -65,7 +67,10 @@ jobs:
             exit 1
           fi
 
-          git add "$LATEST_FILE" "$TODAY_FILE"
+          # Keep every dated snapshot. Never delete previous days.
+          git add data/published/daily_prices.json
+          git add data/published/daily_prices_*.json
+          git add "$HISTORY_FILE"
 
           echo "=== staged ==="
           git diff --staged --name-only

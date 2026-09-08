@@ -66,6 +66,10 @@ def test_build_site_writes_index(tmp_path: Path) -> None:
         json.dumps(prev, ensure_ascii=False),
         encoding="utf-8",
     )
+    (publish / "daily_prices_2026-09-08.json").write_text(
+        json.dumps(payload, ensure_ascii=False),
+        encoding="utf-8",
+    )
     index = build_site(publish, site, enrich_floor=False)
     html = index.read_text(encoding="utf-8")
     assert "SUUMO価格トラッキング" in html
@@ -77,3 +81,5 @@ def test_build_site_writes_index(tmp_path: Path) -> None:
     assert "2LDK" in html
     assert "3階" in html
     assert "viewport" in html
+    assert "平均価格の推移" in html
+    assert "polyline" in html
