@@ -18,9 +18,12 @@ if str(ROOT) not in sys.path:
 from src.citywide import citywide_price_drops
 from src.diff import DiffResult, PriceChange, format_man
 from src.listing_display import (
+    WALK_FILTERS,
+    area_unit_band,
     built_age_years,
     format_built_age,
     price_band,
+    price_band_start,
     ward_label,
 )
 from src.listing_fields import parse_floor_from_detail_html
@@ -38,22 +41,22 @@ SITE_DIR = ROOT / "site"
 TABLE_SCRIPT = Path(__file__).with_name("drops_table.js")
 logger = logging.getLogger(__name__)
 
-DROP_COLUMNS: tuple[tuple[str, str, str], ...] = (
-    ("name", "物件名", "text"),
-    ("ward", "行政区", "text"),
-    ("address", "住所", "text"),
-    ("band", "価格帯", "text"),
-    ("history", "価格履歴", "text"),
-    ("old", "旧価格", "number"),
-    ("new", "新価格", "number"),
-    ("delta", "差額", "number"),
-    ("station", "最寄り駅", "text"),
-    ("walk", "駅徒歩", "number"),
-    ("area", "面積", "number"),
-    ("layout", "間取り", "text"),
-    ("built", "築年数", "number"),
-    ("floor", "階数", "text"),
-    ("url", "リンク", "text"),
+DROP_COLUMNS: tuple[tuple[str, str, str, str], ...] = (
+    ("name", "物件名", "text", "text"),
+    ("ward", "行政区", "text", "exact"),
+    ("address", "住所", "text", "text"),
+    ("band", "価格帯", "number", "exact"),
+    ("history", "価格履歴", "text", "text"),
+    ("old", "旧価格", "number", "price"),
+    ("new", "新価格", "number", "price"),
+    ("delta", "差額", "number", "exact"),
+    ("station", "最寄り駅", "text", "text"),
+    ("walk", "駅徒歩", "number", "walk"),
+    ("area", "面積", "number", "area"),
+    ("layout", "間取り", "text", "exact"),
+    ("built", "築年数", "number", "exact"),
+    ("floor", "階数", "text", "exact"),
+    ("url", "リンク", "text", "exact"),
 )
 
 
@@ -121,46 +124,97 @@ def _attr(value: object) -> str:
 
 def _header_row() -> str:
     cells = []
-    for key, label, col_type in DROP_COLUMNS:
+    for key, label, col_type, _mode in DROP_COLUMNS:
         cells.append(
-            f'<th data-key="{key}" data-type="{col_type}" role="button" tabindex="0">'
-            f"{_escape(label)}</th>"
+            f'<th data-key="{key}" data-type="{col_type}">'
+            f'<button type="button" class="sort-label" data-sort-key="{key}" data-sort-dir="toggle">'
+            f"{_escape(label)}</button>"
+            '<span class="sort-btns">'
+            f'<button type="button" data-sort-key="{key}" data-sort-dir="asc" aria-label="{_escape(label)} 昇順">▲</button>'
+            f'<button type="button" data-sort-key="{key}" data-sort-dir="desc" aria-label="{_escape(label)} 降順">▼</button>'
+            "</span></th>"
         )
     return "<tr>" + "".join(cells) + "</tr>"
+
+
+def _sort_bar() -> str:
+    options = [
+        f'<option value="{key}" data-type="{col_type}">{_escape(label)}</option>'
+        for key, label, col_type, _mode in DROP_COLUMNS
+    ]
+    return (
+        '<div class="sort-bar">'
+        "<label for='sort-key'>並び替え</label>"
+        f'<select id="sort-key">{"".join(options)}</select>'
+        '<button type="button" id="sort-asc">昇順</button>'
+        '<button type="button" id="sort-desc">降順</button>'
+        "</div>"
+    )
 
 
 def _row_values(
     item: PriceChange,
     histories: dict[str, list[PricePoint]],
     snapshot_date: str,
-) -> dict[str, tuple[str, str]]:
+) -> dict[str, tuple[str, str, str]]:
     points = history_for_listing(histories, item.url, item.property_id)
     history_text = format_price_history(points)
     age = built_age_years(item.built_year, snapshot_date)
     built_text = format_built_age(item.built_year, snapshot_date)
+    ward = ward_label(item.ward_name)
+    band = price_band(item.new_price_man)
+    band_start = price_band_start(item.new_price_man)
+    old_text = format_man(item.old_price_man)
+    new_text = format_man(item.new_price_man)
+    area_text = _area_text(item.area_sqm)
     return {
-        "name": (item.name, item.name),
-        "ward": (ward_label(item.ward_name), ward_label(item.ward_name)),
-        "address": (item.address or "-", item.address or "-"),
-        "band": (price_band(item.new_price_man), price_band(item.new_price_man)),
-        "history": (history_text, history_text),
-        "old": (format_man(item.old_price_man), str(item.old_price_man or "")),
-        "new": (format_man(item.new_price_man), str(item.new_price_man or "")),
-        "delta": (format_man(item.delta_man), str(item.delta_man or "")),
-        "station": (item.station_name or "-", item.station_name or "-"),
+        "name": (item.name, item.name, item.name),
+        "ward": (ward, ward, ward),
+        "address": (item.address or "-", item.address or "-", item.address or "-"),
+        "band": (band, "" if band_start is None else str(band_start), band),
+        "history": (history_text, history_text, history_text),
+        "old": (
+            old_text,
+            str(item.old_price_man or ""),
+            price_band(item.old_price_man),
+        ),
+        "new": (
+            new_text,
+            str(item.new_price_man or ""),
+            price_band(item.new_price_man),
+        ),
+        "delta": (
+            format_man(item.delta_man),
+            str(item.delta_man or ""),
+            format_man(item.delta_man),
+        ),
+        "station": (
+            item.station_name or "-",
+            item.station_name or "-",
+            item.station_name or "-",
+        ),
         "walk": (
             _walk_text(item.walk_minutes),
             str(item.walk_minutes if item.walk_minutes is not None else ""),
+            str(item.walk_minutes if item.walk_minutes is not None else ""),
         ),
         "area": (
-            _area_text(item.area_sqm),
+            area_text,
             str(item.area_sqm if item.area_sqm is not None else ""),
+            area_unit_band(item.area_sqm),
         ),
-        "layout": (item.layout or "-", item.layout or "-"),
-        "built": (built_text, str(age if age is not None else "")),
-        "floor": (item.floor or "-", item.floor or "-"),
-        "url": ("SUUMO", item.url),
+        "layout": (item.layout or "-", item.layout or "-", item.layout or "-"),
+        "built": (built_text, str(age if age is not None else ""), built_text),
+        "floor": (item.floor or "-", item.floor or "-", item.floor or "-"),
+        "url": ("SUUMO", item.url, "SUUMO"),
     }
+
+
+def _as_float(raw: str) -> float | None:
+    try:
+        return float(raw)
+    except ValueError:
+        return None
 
 
 def _filter_options(
@@ -168,44 +222,71 @@ def _filter_options(
     histories: dict[str, list[PricePoint]],
     snapshot_date: str,
 ) -> dict[str, list[str]]:
-    collected: dict[str, dict[str, str]] = {key: {} for key, _label, _typ in DROP_COLUMNS}
+    collected: dict[str, dict[str, float | None]] = {
+        key: {} for key, _label, _typ, _mode in DROP_COLUMNS
+    }
     for item in drops:
         values = _row_values(item, histories, snapshot_date)
-        for key, (text, sort_value) in values.items():
-            collected[key][text] = sort_value
+        for key, (_text, sort_value, filter_value) in values.items():
+            if not filter_value:
+                continue
+            numeric = _as_float(sort_value)
+            if filter_value not in collected[key]:
+                collected[key][filter_value] = numeric
+                continue
+            previous = collected[key][filter_value]
+            if numeric is not None and (previous is None or numeric < previous):
+                collected[key][filter_value] = numeric
 
     options: dict[str, list[str]] = {}
-    type_by_key = {key: col_type for key, _label, col_type in DROP_COLUMNS}
+    type_by_key = {key: col_type for key, _label, col_type, _mode in DROP_COLUMNS}
+    mode_by_key = {key: mode for key, _label, _typ, mode in DROP_COLUMNS}
     for key, pairs in collected.items():
+        use_numeric = mode_by_key[key] in {"price", "area", "walk"} or type_by_key[key] == "number"
+
         def sort_key(
             text: str,
-            current_key: str = key,
-            current_pairs: dict[str, str] = pairs,
+            current_pairs: dict[str, float | None] = pairs,
+            numeric: bool = use_numeric,
         ) -> tuple:
-            raw = current_pairs[text]
-            if type_by_key[current_key] == "number":
-                try:
-                    return (0, float(raw))
-                except ValueError:
-                    return (1, 0.0)
-            return (0, raw)
+            if numeric:
+                raw = current_pairs[text]
+                if raw is None:
+                    return (1, 0.0, text)
+                return (0, raw, text)
+            return (0, 0.0, text)
 
         options[key] = sorted(pairs, key=sort_key)
     return options
 
 
+def _filter_control(key: str, label: str, mode: str, options: list[str]) -> str:
+    if mode == "text":
+        return (
+            f'<input type="search" data-filter="{key}" data-filter-mode="text" '
+            f'placeholder="{_escape(label)}" aria-label="{_escape(label)}で検索" />'
+        )
+    if mode == "walk":
+        choices = ['<option value="">すべて</option>']
+        for token, walk_label in WALK_FILTERS:
+            choices.append(f'<option value="{token}">{_escape(walk_label)}</option>')
+        return (
+            f'<select data-filter="{key}" data-filter-mode="walk" '
+            f'aria-label="{_escape(label)}で絞り込み">{"".join(choices)}</select>'
+        )
+    choices = ['<option value="">すべて</option>']
+    for value in options:
+        choices.append(f'<option value="{_attr(value)}">{_escape(value)}</option>')
+    return (
+        f'<select data-filter="{key}" data-filter-mode="{mode}" '
+        f'aria-label="{_escape(label)}で絞り込み">{"".join(choices)}</select>'
+    )
+
+
 def _filter_row(options: dict[str, list[str]]) -> str:
     cells = []
-    for key, label, _col_type in DROP_COLUMNS:
-        choices = ['<option value="">すべて</option>']
-        for value in options.get(key, []):
-            choices.append(f'<option value="{_attr(value)}">{_escape(value)}</option>')
-        cells.append(
-            "<th>"
-            f'<select data-filter="{key}" aria-label="{_escape(label)}で絞り込み">'
-            f"{''.join(choices)}</select>"
-            "</th>"
-        )
+    for key, label, _col_type, mode in DROP_COLUMNS:
+        cells.append(f"<th>{_filter_control(key, label, mode, options.get(key, []))}</th>")
     return '<tr class="filters">' + "".join(cells) + "</tr>"
 
 
@@ -221,11 +302,13 @@ def _drop_rows(
         values = _row_values(item, histories, snapshot_date)
         attrs = []
         cells = []
-        for key, _label, _col_type in DROP_COLUMNS:
-            text, sort_value = values[key]
+        for key, _label, _col_type, _mode in DROP_COLUMNS:
+            text, sort_value, filter_value = values[key]
             attrs.append(f'data-{key}="{_attr(text)}"')
             if sort_value != text:
                 attrs.append(f'data-{key}-sort="{_attr(sort_value)}"')
+            if filter_value != text:
+                attrs.append(f'data-{key}-filter="{_attr(filter_value)}"')
             if key == "url":
                 cells.append(
                     f"<td><a href='{_escape(item.url)}' target='_blank' rel='noopener'>"
@@ -339,17 +422,59 @@ def render_html(
       color: var(--muted);
       font-weight: 600;
       white-space: nowrap;
-      cursor: pointer;
       user-select: none;
     }}
-    th[data-key]:hover {{ color: var(--accent); }}
-    th[aria-sort="ascending"]::after {{ content: " ▲"; font-size: 0.7em; }}
-    th[aria-sort="descending"]::after {{ content: " ▼"; font-size: 0.7em; }}
+    th[data-key] .sort-label {{
+      display: block;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      text-align: left;
+    }}
+    th[data-key] .sort-label:hover {{ color: var(--accent); }}
+    .sort-btns {{
+      display: inline-flex;
+      gap: 0.15rem;
+      margin-left: 0.2rem;
+    }}
+    .sort-btns button,
+    .sort-bar button {{
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 6px;
+      padding: 0.05rem 0.3rem;
+      font-size: 0.68rem;
+      cursor: pointer;
+      color: var(--muted);
+    }}
+    th[aria-sort="ascending"] .sort-btns button[data-sort-dir="asc"],
+    th[aria-sort="descending"] .sort-btns button[data-sort-dir="desc"] {{
+      color: var(--accent);
+      border-color: var(--accent);
+    }}
+    .sort-bar {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
+      margin: 0.55rem 0 0.75rem;
+    }}
+    .sort-bar select {{
+      min-width: 8rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.28rem 0.35rem;
+      background: #fff;
+    }}
     tr.filters th {{
       padding: 0.2rem 0.2rem 0.45rem;
       font-weight: 400;
     }}
-    tr.filters select {{
+    tr.filters select,
+    tr.filters input {{
       width: 100%;
       min-width: 5.5rem;
       max-width: 11rem;
@@ -394,7 +519,8 @@ def render_html(
 
     <section class="card">
       <h2>値下げ一覧（全区横断）</h2>
-      <p class="sub">列名をクリックでソート、下の選択で絞り込みます。表示 <span id="drops-visible-count">{len(drops)}</span> / {len(drops)}件</p>
+      <p class="sub">物件名・住所・価格履歴・最寄り駅は文字検索。価格は1000万円単位、駅徒歩は分数、面積は10m2単位で絞り込めます。表示 <span id="drops-visible-count">{len(drops)}</span> / {len(drops)}件</p>
+      {_sort_bar()}
       <div class="table-wrap"><table id="drops-table">
         <thead>
           {_header_row()}

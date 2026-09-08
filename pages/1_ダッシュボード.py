@@ -20,7 +20,14 @@ from src.db import (
     list_watch_configs,
 )
 from src.diff import compare_listings, format_man
-from src.listing_display import format_built_age, price_band, ward_label
+from src.listing_display import (
+    WALK_FILTERS,
+    area_unit_band,
+    format_built_age,
+    price_band,
+    walk_matches,
+    ward_label,
+)
 from src.listing_fields import parse_station_name, parse_walk_minutes
 from src.property_history import (
     PricePoint,
@@ -158,20 +165,90 @@ def render_dashboard() -> None:
             ]
         )
         all_label = "（すべて）"
+        text_columns = ("物件名", "住所", "価格履歴", "最寄り駅")
+        price_columns = ("旧価格", "新価格")
+        filtered = drop_df
         with st.expander("列で絞り込み", expanded=True):
             filter_cols = st.columns(4)
-            filtered = drop_df
-            column_names = list(drop_df.columns)
-            for index, column in enumerate(column_names):
+            column_index = 0
+            for column in drop_df.columns:
+                widget_key = f"drop_filter_{column}"
+                slot = filter_cols[column_index % 4]
+                column_index += 1
+                if column in text_columns:
+                    query = slot.text_input(column, key=widget_key)
+                    if query.strip():
+                        filtered = filtered[
+                            filtered[column]
+                            .astype(str)
+                            .str.contains(query.strip(), case=False, na=False)
+                        ]
+                    continue
+                if column == "駅徒歩":
+                    walk_labels = [all_label] + [label for _token, label in WALK_FILTERS]
+                    query = slot.selectbox(column, walk_labels, key=widget_key)
+                    if query != all_label:
+                        token = next(
+                            token for token, label in WALK_FILTERS if label == query
+                        )
+                        filtered = filtered[
+                            filtered[column].map(lambda minutes: walk_matches(minutes, token))
+                        ]
+                    continue
+                if column == "面積":
+                    area_labels = []
+                    seen_areas: set[str] = set()
+                    for value in sorted(drop_df[column].dropna().tolist()):
+                        label = area_unit_band(value)
+                        if label not in seen_areas:
+                            seen_areas.add(label)
+                            area_labels.append(label)
+                    query = slot.selectbox(column, [all_label] + area_labels, key=widget_key)
+                    if query != all_label:
+                        filtered = filtered[
+                            filtered[column].map(area_unit_band) == query
+                        ]
+                    continue
+                if column in price_columns:
+                    price_labels = []
+                    seen_prices: set[str] = set()
+                    for value in sorted(drop_df[column].dropna().tolist()):
+                        label = price_band(int(value))
+                        if label not in seen_prices:
+                            seen_prices.add(label)
+                            price_labels.append(label)
+                    query = slot.selectbox(column, [all_label] + price_labels, key=widget_key)
+                    if query != all_label:
+                        filtered = filtered[
+                            filtered[column].map(
+                                lambda value: price_band(
+                                    None if pd.isna(value) else int(value)
+                                )
+                            )
+                            == query
+                        ]
+                    continue
                 choices = [all_label] + sorted(
                     drop_df[column].dropna().astype(str).unique().tolist()
                 )
-                query = filter_cols[index % 4].selectbox(
-                    column, choices, key=f"drop_filter_{column}"
-                )
+                query = slot.selectbox(column, choices, key=widget_key)
                 if query != all_label:
                     filtered = filtered[filtered[column].astype(str) == query]
-        st.caption(f"表示 {len(filtered)} / {len(drop_df)}件。列名クリックでソートできます。")
+
+        sort_cols = st.columns([2, 1])
+        sort_column = sort_cols[0].selectbox("並び替え", list(drop_df.columns), key="drop_sort_column")
+        sort_order = sort_cols[1].radio(
+            "順序",
+            ("昇順", "降順"),
+            horizontal=True,
+            key="drop_sort_order",
+        )
+        filtered = filtered.sort_values(
+            by=sort_column,
+            ascending=sort_order == "昇順",
+            na_position="last",
+        )
+        st.caption(f"表示 {len(filtered)} / {len(drop_df)}件。並び替えは上の昇順・降順でも切り替えできます。")
         st.dataframe(
             filtered,
             use_container_width=True,
