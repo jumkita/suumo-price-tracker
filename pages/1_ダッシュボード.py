@@ -20,6 +20,7 @@ from src.db import (
     list_watch_configs,
 )
 from src.diff import compare_listings, format_man
+from src.listing_display import price_band, ward_label
 from src.listing_fields import parse_station_name, parse_walk_minutes
 from src.property_history import (
     PricePoint,
@@ -126,34 +127,57 @@ def render_dashboard() -> None:
             [
                 {
                     "物件名": item.name,
+                    "行政区": ward_label(item.ward_name),
+                    "住所": item.address or "-",
+                    "価格帯": price_band(item.new_price_man),
                     "価格履歴": format_price_history(
                         history_for_listing(histories, item.url, item.property_id)
                     ),
-                    "旧価格": format_man(item.old_price_man),
-                    "新価格": format_man(item.new_price_man),
-                    "差額": format_man(item.delta_man),
+                    "旧価格": item.old_price_man,
+                    "新価格": item.new_price_man,
+                    "差額": item.delta_man,
                     "最寄り駅": item.station_name
                     or parse_station_name(item.station)
                     or "-",
-                    "駅徒歩": (
-                        f"徒歩{item.walk_minutes}分"
-                        if item.walk_minutes is not None
-                        else (
-                            f"徒歩{parse_walk_minutes(item.station)}分"
-                            if parse_walk_minutes(item.station) is not None
-                            else "-"
-                        )
-                    ),
+                    "駅徒歩": item.walk_minutes
+                    if item.walk_minutes is not None
+                    else parse_walk_minutes(item.station),
                     "面積": item.area_sqm,
                     "間取り": item.layout or "-",
                     "階数": item.floor or "-",
-                    "区": item.ward_name,
                     "URL": item.url,
                 }
                 for item in drops
             ]
         )
-        st.dataframe(drop_df, use_container_width=True, hide_index=True)
+        with st.expander("列で絞り込み", expanded=True):
+            filter_cols = st.columns(4)
+            filtered = drop_df
+            column_names = list(drop_df.columns)
+            for index, column in enumerate(column_names):
+                query = filter_cols[index % 4].text_input(
+                    column, key=f"drop_filter_{column}"
+                )
+                if query:
+                    filtered = filtered[
+                        filtered[column]
+                        .astype(str)
+                        .str.contains(query, case=False, na=False)
+                    ]
+        st.caption(f"表示 {len(filtered)} / {len(drop_df)}件。列名クリックでソートできます。")
+        st.dataframe(
+            filtered,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "旧価格": st.column_config.NumberColumn(format="%d万円"),
+                "新価格": st.column_config.NumberColumn(format="%d万円"),
+                "差額": st.column_config.NumberColumn(format="%d万円"),
+                "駅徒歩": st.column_config.NumberColumn(format="%d分"),
+                "面積": st.column_config.NumberColumn(format="%.2f m2"),
+                "URL": st.column_config.LinkColumn("リンク"),
+            },
+        )
     else:
         st.write("値下げはありません。")
 

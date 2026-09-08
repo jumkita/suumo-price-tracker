@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 
 from src.citywide import citywide_price_drops
 from src.diff import DiffResult, PriceChange, format_man
+from src.listing_display import price_band, ward_label
 from src.listing_fields import parse_floor_from_detail_html
 from src.property_history import (
     PricePoint,
@@ -29,7 +30,25 @@ from src.tweet_draft import build_tweet_draft
 
 PUBLISH_DIR = ROOT / "data" / "published"
 SITE_DIR = ROOT / "site"
+TABLE_SCRIPT = Path(__file__).with_name("drops_table.js")
 logger = logging.getLogger(__name__)
+
+DROP_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    ("name", "物件名", "text"),
+    ("ward", "行政区", "text"),
+    ("address", "住所", "text"),
+    ("band", "価格帯", "text"),
+    ("history", "価格履歴", "text"),
+    ("old", "旧価格", "number"),
+    ("new", "新価格", "number"),
+    ("delta", "差額", "number"),
+    ("station", "最寄り駅", "text"),
+    ("walk", "駅徒歩", "number"),
+    ("area", "面積", "number"),
+    ("layout", "間取り", "text"),
+    ("floor", "階数", "text"),
+    ("url", "リンク", "text"),
+)
 
 
 def _load(path: Path) -> dict | None:
@@ -89,27 +108,82 @@ def enrich_floors(
     return enriched
 
 
+def _attr(value: object) -> str:
+    return _escape(value)
+
+
+def _header_row() -> str:
+    cells = []
+    for key, label, col_type in DROP_COLUMNS:
+        cells.append(
+            f'<th data-key="{key}" data-type="{col_type}" role="button" tabindex="0">'
+            f"{_escape(label)}</th>"
+        )
+    return "<tr>" + "".join(cells) + "</tr>"
+
+
+def _filter_row() -> str:
+    cells = []
+    for key, label, _col_type in DROP_COLUMNS:
+        cells.append(
+            "<th>"
+            f'<input type="search" data-filter="{key}" placeholder="{_escape(label)}" '
+            'aria-label="絞り込み" />'
+            "</th>"
+        )
+    return '<tr class="filters">' + "".join(cells) + "</tr>"
+
+
 def _drop_rows(
     drops: list[PriceChange],
     histories: dict[str, list[PricePoint]],
 ) -> str:
     if not drops:
-        return "<tr><td colspan='11'>値下げはありません</td></tr>"
+        return f"<tr><td colspan='{len(DROP_COLUMNS)}'>値下げはありません</td></tr>"
     rows = []
     for item in drops:
         points = history_for_listing(histories, item.url, item.property_id)
+        history_text = format_price_history(points)
+        ward = ward_label(item.ward_name)
+        band = price_band(item.new_price_man)
+        address = item.address or "-"
+        old_text = format_man(item.old_price_man)
+        new_text = format_man(item.new_price_man)
+        delta_text = format_man(item.delta_man)
+        station = item.station_name or "-"
+        walk = _walk_text(item.walk_minutes)
+        area = _area_text(item.area_sqm)
+        layout = item.layout or "-"
+        floor = item.floor or "-"
         rows.append(
-            "<tr>"
+            "<tr "
+            f'data-name="{_attr(item.name)}" '
+            f'data-ward="{_attr(ward)}" '
+            f'data-address="{_attr(address)}" '
+            f'data-band="{_attr(band)}" '
+            f'data-history="{_attr(history_text)}" '
+            f'data-old="{_attr(old_text)}" data-old-sort="{_attr(item.old_price_man or "")}" '
+            f'data-new="{_attr(new_text)}" data-new-sort="{_attr(item.new_price_man or "")}" '
+            f'data-delta="{_attr(delta_text)}" data-delta-sort="{_attr(item.delta_man or "")}" '
+            f'data-station="{_attr(station)}" '
+            f'data-walk="{_attr(walk)}" data-walk-sort="{_attr(item.walk_minutes if item.walk_minutes is not None else "")}" '
+            f'data-area="{_attr(area)}" data-area-sort="{_attr(item.area_sqm if item.area_sqm is not None else "")}" '
+            f'data-layout="{_attr(layout)}" '
+            f'data-floor="{_attr(floor)}" '
+            f'data-url="{_attr(item.url)}">'
             f"<td>{_escape(item.name)}</td>"
-            f"<td>{_escape(format_price_history(points))}</td>"
-            f"<td>{_escape(format_man(item.old_price_man))}</td>"
-            f"<td>{_escape(format_man(item.new_price_man))}</td>"
-            f"<td>{_escape(format_man(item.delta_man))}</td>"
-            f"<td>{_escape(item.station_name or '-')}</td>"
-            f"<td>{_escape(_walk_text(item.walk_minutes))}</td>"
-            f"<td>{_escape(_area_text(item.area_sqm))}</td>"
-            f"<td>{_escape(item.layout or '-')}</td>"
-            f"<td>{_escape(item.floor or '-')}</td>"
+            f"<td>{_escape(ward)}</td>"
+            f"<td>{_escape(address)}</td>"
+            f"<td>{_escape(band)}</td>"
+            f"<td>{_escape(history_text)}</td>"
+            f"<td>{_escape(old_text)}</td>"
+            f"<td>{_escape(new_text)}</td>"
+            f"<td>{_escape(delta_text)}</td>"
+            f"<td>{_escape(station)}</td>"
+            f"<td>{_escape(walk)}</td>"
+            f"<td>{_escape(area)}</td>"
+            f"<td>{_escape(layout)}</td>"
+            f"<td>{_escape(floor)}</td>"
             f"<td><a href='{_escape(item.url)}' target='_blank' rel='noopener'>SUUMO</a></td>"
             "</tr>"
         )
@@ -135,6 +209,7 @@ def render_html(
         unchanged_count=0,
     )
     draft = build_tweet_draft("東京23区", summary_diff)
+    table_js = TABLE_SCRIPT.read_text(encoding="utf-8")
 
     return f"""<!DOCTYPE html>
 <html lang="ja">
@@ -202,7 +277,7 @@ def render_html(
       width: 100%;
       border-collapse: collapse;
       font-size: 0.8rem;
-      min-width: 860px;
+      min-width: 1180px;
     }}
     th, td {{
       border-bottom: 1px solid var(--line);
@@ -210,7 +285,29 @@ def render_html(
       padding: 0.45rem 0.35rem;
       vertical-align: top;
     }}
-    th {{ color: var(--muted); font-weight: 600; white-space: nowrap; }}
+    th[data-key] {{
+      color: var(--muted);
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }}
+    th[data-key]:hover {{ color: var(--accent); }}
+    th[aria-sort="ascending"]::after {{ content: " ▲"; font-size: 0.7em; }}
+    th[aria-sort="descending"]::after {{ content: " ▼"; font-size: 0.7em; }}
+    tr.filters th {{
+      padding: 0.2rem 0.2rem 0.45rem;
+      font-weight: 400;
+    }}
+    tr.filters input {{
+      width: 100%;
+      min-width: 5.5rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.28rem 0.35rem;
+      font-size: 0.72rem;
+      background: #fff;
+    }}
     a {{ color: var(--accent); }}
     footer {{
       text-align: center;
@@ -246,13 +343,11 @@ def render_html(
 
     <section class="card">
       <h2>値下げ一覧（全区横断）</h2>
-      <p class="sub">行政区を分けず、値下げ額が大きい順です。価格履歴は保存済みの日付をすべて出します（平均は使いません）。</p>
-      <div class="table-wrap"><table>
+      <p class="sub">列名をクリックでソート、下の入力で絞り込みます。表示 <span id="drops-visible-count">{len(drops)}</span> / {len(drops)}件</p>
+      <div class="table-wrap"><table id="drops-table">
         <thead>
-          <tr>
-            <th>物件名</th><th>価格履歴</th><th>旧価格</th><th>新価格</th><th>差額</th>
-            <th>最寄り駅</th><th>駅徒歩</th><th>面積</th><th>間取り</th><th>階数</th><th>リンク</th>
-          </tr>
+          {_header_row()}
+          {_filter_row()}
         </thead>
         <tbody>
           {_drop_rows(drops, histories)}
@@ -264,6 +359,9 @@ def render_html(
     データは GitHub Actions が日次更新します。<br/>
     <a href="https://github.com/jumkita/suumo-price-tracker">GitHubリポジトリ</a>
   </footer>
+  <script>
+{table_js}
+  </script>
 </body>
 </html>
 """

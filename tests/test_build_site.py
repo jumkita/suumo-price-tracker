@@ -85,3 +85,9 @@ def test_build_site_writes_index(tmp_path: Path) -> None:
     assert "2026-09-07 5000万円" in html
     assert "2026-09-08 4800万円" in html
     assert "平均価格の推移" not in html
+    assert "東京都千代田区" in html
+    assert "千代田区" in html
+    assert "3000万〜5000万円" in html
+    assert "data-filter=" in html
+    assert "data-key=" in html
+    assert "drops-table" in html
