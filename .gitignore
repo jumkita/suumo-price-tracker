@@ -8,3 +8,5 @@ data/logs/
 data/scrape_*.log
 .streamlit/secrets.toml
 *.log
+site/index.html
+site/data/
