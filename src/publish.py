@@ -31,6 +31,8 @@ def listing_to_dict(row: ListingRow) -> dict:
         "layout": row.layout,
         "built_year": row.built_year,
         "station": row.station,
+        "walk_minutes": row.walk_minutes,
+        "floor": row.floor,
         "url": row.url,
     }
 

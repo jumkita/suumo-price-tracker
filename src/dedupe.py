@@ -69,6 +69,8 @@ def collapse_to_cheapest(listings: list[Listing]) -> list[Listing]:
                 built_year=best.built_year,
                 station=best.station,
                 url=best.url,
+                walk_minutes=best.walk_minutes,
+                floor=best.floor,
             )
         )
 

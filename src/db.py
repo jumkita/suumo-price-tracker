@@ -44,6 +44,8 @@ class ListingRow:
     built_year: str
     station: str
     url: str
+    walk_minutes: int | None = None
+    floor: str = ""
 
 
 @dataclass(frozen=True)
@@ -137,6 +139,8 @@ def init_db(db_path: Path | None = None) -> None:
                 built_year TEXT NOT NULL DEFAULT '',
                 station TEXT NOT NULL DEFAULT '',
                 url TEXT NOT NULL DEFAULT '',
+                walk_minutes INTEGER,
+                floor TEXT NOT NULL DEFAULT '',
                 UNIQUE(snapshot_id, property_id),
                 FOREIGN KEY(snapshot_id) REFERENCES snapshots(id) ON DELETE CASCADE
             );
@@ -147,6 +151,18 @@ def init_db(db_path: Path | None = None) -> None:
                 ON listings(property_id);
             """
         )
+        _migrate_listings_columns(conn)
+
+
+def _migrate_listings_columns(conn: sqlite3.Connection) -> None:
+    columns = {
+        (row["name"] if isinstance(row, sqlite3.Row) else row[1])
+        for row in conn.execute("PRAGMA table_info(listings)").fetchall()
+    }
+    if "walk_minutes" not in columns:
+        conn.execute("ALTER TABLE listings ADD COLUMN walk_minutes INTEGER")
+    if "floor" not in columns:
+        conn.execute("ALTER TABLE listings ADD COLUMN floor TEXT NOT NULL DEFAULT ''")
 
 
 def add_watch_config(
@@ -272,8 +288,8 @@ def upsert_snapshot(
             """
             INSERT INTO listings (
                 snapshot_id, property_id, name, address, price_man,
-                area_sqm, layout, built_year, station, url
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                area_sqm, layout, built_year, station, url, walk_minutes, floor
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -287,6 +303,8 @@ def upsert_snapshot(
                     item.built_year,
                     item.station,
                     item.url,
+                    item.walk_minutes,
+                    item.floor,
                 )
                 for item in listings
             ],
@@ -335,7 +353,7 @@ def get_listings_for_snapshot(
         rows = conn.execute(
             """
             SELECT property_id, name, address, price_man, area_sqm,
-                   layout, built_year, station, url
+                   layout, built_year, station, url, walk_minutes, floor
             FROM listings
             WHERE snapshot_id = ?
             """,
@@ -352,6 +370,8 @@ def get_listings_for_snapshot(
             built_year=row["built_year"] or "",
             station=row["station"] or "",
             url=row["url"] or "",
+            walk_minutes=row["walk_minutes"],
+            floor=row["floor"] or "",
         )
         for row in rows
     ]

@@ -74,6 +74,8 @@ def fetch_json(url: str, timeout: float = 60.0) -> dict[str, Any]:
 def _listings_from_payload(config_block: dict[str, Any]) -> list[ListingRow]:
     rows: list[ListingRow] = []
     for item in config_block.get("listings") or []:
+        station = str(item.get("station") or "")
+        walk = item.get("walk_minutes")
         rows.append(
             ListingRow(
                 property_id=str(item["property_id"]),
@@ -83,8 +85,10 @@ def _listings_from_payload(config_block: dict[str, Any]) -> list[ListingRow]:
                 area_sqm=item.get("area_sqm"),
                 layout=str(item.get("layout") or ""),
                 built_year=str(item.get("built_year") or ""),
-                station=str(item.get("station") or ""),
+                station=station,
                 url=str(item.get("url") or ""),
+                walk_minutes=walk,
+                floor=str(item.get("floor") or ""),
             )
         )
     return rows

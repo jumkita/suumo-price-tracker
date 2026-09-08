@@ -48,6 +48,8 @@ def _to_row(listing: Listing) -> ListingRow:
         built_year=listing.built_year,
         station=listing.station,
         url=listing.url,
+        walk_minutes=listing.walk_minutes,
+        floor=listing.floor,
     )
 
 

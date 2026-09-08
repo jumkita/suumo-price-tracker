@@ -11,8 +11,15 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.db import init_db, list_snapshots, list_watch_configs
-from src.diff import format_man
+from src.db import (
+    get_latest_two_snapshots,
+    get_listings_for_snapshot,
+    init_db,
+    list_snapshots,
+    list_watch_configs,
+)
+from src.diff import compare_listings, format_man
+from src.listing_fields import parse_station_name, parse_walk_minutes
 from src.pipeline import load_diff_for_config, price_history
 from src.remote_sync import resolve_remote_json_url, sync_from_remote
 
@@ -22,7 +29,7 @@ init_db()
 st.title("ダッシュボード")
 st.caption(
     "データは GitHub Actions が日次更新します。"
-    "下のボタンで最新 JSON を取り込み、表示は5分ごとに自動再読込します。"
+    "値下げは行政区を分けず一覧表示します。"
 )
 
 
@@ -51,133 +58,107 @@ if sync_cols[1].button("最新データを読み込み", type="primary"):
 
 configs = list_watch_configs()
 if not configs:
-    st.info("データがありません。「最新データを読み込み」を押すか、監視設定から取得してください。")
+    st.info("データがありません。「最新データを読み込み」を押してください。")
     st.stop()
 
-labels = {f"{c.id}: {c.name}": c.id for c in configs}
-selected_label = st.selectbox("監視対象", list(labels.keys()))
-config_id = labels[selected_label]
+
+def load_citywide_drops():
+    drops = []
+    for config in configs:
+        current_meta, previous_meta = get_latest_two_snapshots(config.id)
+        if current_meta is None or previous_meta is None:
+            continue
+        diff = compare_listings(
+            get_listings_for_snapshot(previous_meta.id),
+            get_listings_for_snapshot(current_meta.id),
+            ward_name=config.name,
+        )
+        drops.extend(diff.price_drops)
+    drops.sort(
+        key=lambda item: (
+            item.delta_man if item.delta_man is not None else 0,
+            item.name,
+        )
+    )
+    return drops
 
 
 @st.fragment(run_every=timedelta(minutes=5))
-def render_dashboard(selected_config_id: int) -> None:
+def render_dashboard() -> None:
     st.caption(f"表示更新: {datetime.now():%Y-%m-%d %H:%M:%S}")
-    _, diff, current_avg, previous_avg = load_diff_for_config(selected_config_id)
-    snaps = list_snapshots(selected_config_id)
+    drops = load_citywide_drops()
 
-    col1, col2, col3, col4 = st.columns(4)
-    latest_count = snaps[0].listing_count if snaps else 0
-    col1.metric("最新件数", latest_count)
-    col2.metric("値下げ", diff.drop_count if diff else 0)
-    col3.metric("新規", diff.new_count if diff else 0)
+    col1, col2, col3 = st.columns(3)
+    col1.metric("監視区数", len(configs))
+    total_listings = 0
+    for config in configs:
+        snaps = list_snapshots(config.id)
+        if snaps:
+            total_listings += snaps[0].listing_count
+    col2.metric("最新件数（合計）", total_listings)
+    col3.metric("値下げ（全区）", len(drops))
 
+    st.subheader("値下げ一覧（全区横断）")
+    if drops:
+        drop_df = pd.DataFrame(
+            [
+                {
+                    "物件名": item.name,
+                    "旧価格": format_man(item.old_price_man),
+                    "新価格": format_man(item.new_price_man),
+                    "差額": format_man(item.delta_man),
+                    "最寄り駅": item.station_name
+                    or parse_station_name(item.station)
+                    or "-",
+                    "駅徒歩": (
+                        f"徒歩{item.walk_minutes}分"
+                        if item.walk_minutes is not None
+                        else (
+                            f"徒歩{parse_walk_minutes(item.station)}分"
+                            if parse_walk_minutes(item.station) is not None
+                            else "-"
+                        )
+                    ),
+                    "面積": item.area_sqm,
+                    "間取り": item.layout or "-",
+                    "階数": item.floor or "-",
+                    "区": item.ward_name,
+                    "URL": item.url,
+                }
+                for item in drops
+            ]
+        )
+        st.dataframe(drop_df, use_container_width=True, hide_index=True)
+    else:
+        st.write("値下げはありません。")
+
+    st.subheader("区ごとの参考指標")
+    labels = {f"{c.id}: {c.name}": c.id for c in configs}
+    selected_label = st.selectbox("監視対象", list(labels.keys()))
+    config_id = labels[selected_label]
+    _, diff, current_avg, previous_avg = load_diff_for_config(config_id)
+    snaps = list_snapshots(config_id)
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("最新件数", snaps[0].listing_count if snaps else 0)
+    m2.metric("値下げ", diff.drop_count if diff else 0)
+    m3.metric("新規", diff.new_count if diff else 0)
     avg_delta = None
     if current_avg is not None and previous_avg is not None:
         avg_delta = round(current_avg - previous_avg, 1)
-    col4.metric(
+    m4.metric(
         "平均価格（万円）",
         f"{current_avg:.0f}" if current_avg is not None else "-",
         f"{avg_delta:+.0f}" if avg_delta is not None else None,
     )
 
-    history = price_history(selected_config_id)
+    history = price_history(config_id)
     if history:
-        st.subheader("平均価格の推移")
         hist_df = pd.DataFrame(history, columns=["日付", "平均価格_万円"]).set_index("日付")
         if len(hist_df) == 1:
             st.bar_chart(hist_df)
         else:
             st.line_chart(hist_df)
-    else:
-        st.caption("スナップショットがまだありません。")
-
-    if diff is None:
-        st.info("変動比較はスナップショットが2日分そろってから表示されます。")
-    else:
-        st.subheader("値下げ一覧")
-        if diff.price_drops:
-            drop_df = pd.DataFrame(
-                [
-                    {
-                        "物件名": item.name,
-                        "旧価格": format_man(item.old_price_man),
-                        "新価格": format_man(item.new_price_man),
-                        "差額": format_man(item.delta_man),
-                        "駅": item.station,
-                        "URL": item.url,
-                    }
-                    for item in diff.price_drops
-                ]
-            )
-            st.dataframe(drop_df, use_container_width=True, hide_index=True)
-        else:
-            st.write("値下げはありません。")
-
-        st.subheader("新規掲載")
-        if diff.new_listings:
-            new_df = pd.DataFrame(
-                [
-                    {
-                        "物件名": item.name,
-                        "価格": format_man(item.price_man),
-                        "面積": item.area_sqm,
-                        "間取り": item.layout,
-                        "駅": item.station,
-                        "URL": item.url,
-                    }
-                    for item in diff.new_listings
-                ]
-            )
-            st.dataframe(new_df, use_container_width=True, hide_index=True)
-        else:
-            st.write("新規はありません。")
-
-        with st.expander("値上げ・削除"):
-            if diff.price_rises:
-                rise_df = pd.DataFrame(
-                    [
-                        {
-                            "物件名": item.name,
-                            "旧価格": format_man(item.old_price_man),
-                            "新価格": format_man(item.new_price_man),
-                            "差額": format_man(item.delta_man),
-                            "URL": item.url,
-                        }
-                        for item in diff.price_rises
-                    ]
-                )
-                st.dataframe(rise_df, use_container_width=True, hide_index=True)
-            else:
-                st.write("値上げはありません。")
-
-            if diff.removed_listings:
-                removed_df = pd.DataFrame(
-                    [
-                        {
-                            "物件名": item.name,
-                            "価格": format_man(item.price_man),
-                            "URL": item.url,
-                        }
-                        for item in diff.removed_listings
-                    ]
-                )
-                st.dataframe(removed_df, use_container_width=True, hide_index=True)
-            else:
-                st.write("削除（掲載終了）はありません。")
-
-    if snaps:
-        st.subheader("取得履歴")
-        snap_df = pd.DataFrame(
-            [
-                {
-                    "日付": s.snapshot_date,
-                    "件数": s.listing_count,
-                    "取得時刻": s.fetched_at,
-                }
-                for s in snaps
-            ]
-        )
-        st.dataframe(snap_df, use_container_width=True, hide_index=True)
 
 
-render_dashboard(config_id)
+render_dashboard()

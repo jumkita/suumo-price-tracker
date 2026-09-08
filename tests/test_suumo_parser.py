@@ -49,10 +49,14 @@ def test_parse_search_html_fixture() -> None:
     assert len(listings) == 2
     assert listings[0].property_id == "111111111"
     assert listings[0].name == "サンプルコート千代田"
+    assert "即！見学" not in listings[0].name
     assert listings[0].price_man == 5980
     assert listings[0].area_sqm == 65.2
     assert listings[0].layout == "2LDK"
+    assert listings[0].walk_minutes == 5
+    assert listings[1].name == "パークホームズ皇居前"
     assert listings[1].price_man == 12800
+    assert listings[1].walk_minutes == 3
 
 
 def test_scrape_search_results_with_fake_fetch() -> None:

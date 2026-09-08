@@ -13,6 +13,8 @@ import httpx
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
+from src.listing_fields import parse_floor_text, parse_walk_minutes
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_USER_AGENT = (
@@ -41,6 +43,8 @@ class Listing:
     built_year: str
     station: str
     url: str
+    walk_minutes: int | None = None
+    floor: str = ""
 
 
 FetchFunc = Callable[[str], str]
@@ -171,6 +175,17 @@ def _pick(mapping: dict[str, str], *keys: str) -> str:
     return ""
 
 
+def clean_property_name(name: str) -> str:
+    """Prefer bare building names; strip catch-copy suffixes."""
+    text = " ".join((name or "").split()).strip()
+    if not text:
+        return ""
+    for sep in ("◆", "■", "｜", "|"):
+        if sep in text:
+            text = text.split(sep, 1)[0].strip()
+    return text.strip(" ….")
+
+
 def parse_listing_unit(unit: Tag) -> Listing | None:
     title = unit.select_one("h2.property_unit-title a") or unit.select_one(
         ".property_unit-title a"
@@ -186,15 +201,24 @@ def parse_listing_unit(unit: Tag) -> Listing | None:
     if not property_id:
         return None
 
-    name = _text(title)
     url = absolute_url(href)
     mapping = _dl_map(unit)
+
+    # h2 is usually agency catch-copy; 物件名 is the real building name.
+    name = clean_property_name(_pick(mapping, "物件名")) or clean_property_name(
+        _text(title)
+    )
 
     price_text = _pick(mapping, "販売価格", "価格")
     if not price_text:
         price_span = unit.select_one("span.dottable-value")
         price_text = _text(price_span)
 
+    station = _pick(mapping, "沿線・駅", "交通", "最寄り駅")
+    floor = parse_floor_text(
+        _pick(mapping, "所在階", "所在階/構造・階建", "階"),
+        name,
+    )
     return Listing(
         property_id=property_id,
         name=name or f"物件{property_id}",
@@ -203,8 +227,10 @@ def parse_listing_unit(unit: Tag) -> Listing | None:
         area_sqm=parse_area_sqm(_pick(mapping, "専有面積", "面積")),
         layout=_pick(mapping, "間取り"),
         built_year=_pick(mapping, "築年月", "築年"),
-        station=_pick(mapping, "沿線・駅", "交通", "最寄り駅"),
+        station=station,
         url=url,
+        walk_minutes=parse_walk_minutes(station),
+        floor=floor,
     )
 
 
