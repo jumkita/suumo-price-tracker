@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from src.db import ListingRow
 from src.diff import DiffResult, PriceChange
-from src.tweet_draft import build_tweet_draft
+from src.tweet_draft import build_first_day_draft, build_tweet_draft
 
 
 def _empty_diff() -> DiffResult:
@@ -19,8 +19,12 @@ def _empty_diff() -> DiffResult:
 
 def test_build_tweet_draft_no_changes() -> None:
     draft = build_tweet_draft("千代田区", _empty_diff())
+    assert "【日次】" not in draft
+    assert "新規:" not in draft
     assert "目立った価格変動はありませんでした" in draft
-    assert "#不動産" in draft
+    assert "#中古マンション" in draft
+    assert "#東京23区" in draft
+    assert "#マンション相場" in draft
     assert len(draft) <= 280
 
 
@@ -43,10 +47,15 @@ def test_build_tweet_draft_with_drop() -> None:
         removed_listings=[],
         unchanged_count=0,
     )
-    draft = build_tweet_draft("千代田区", diff)
-    assert "値下げ:1件" in draft
+    draft = build_tweet_draft("東京23区", diff)
+    assert "【日次】" not in draft
+    assert "東京23区 中古マンション" in draft
+    assert "値下げ:1件 / 値上げ:0件" in draft
+    assert "新規:" not in draft
     assert "サンプルコート千代田" in draft
     assert "5980万円→5780万円" in draft
+    assert "#中古マンション #東京23区 #値下げ" in draft
+    assert "#不動産" not in draft
     assert len(draft) <= 280
 
 
@@ -88,9 +97,9 @@ def test_build_tweet_draft_respects_max_chars() -> None:
 
 
 def test_build_first_day_draft() -> None:
-    from src.tweet_draft import build_first_day_draft
-
     draft = build_first_day_draft("千代田区", listing_count=550, avg_price_man=12345.6)
+    assert "【日次】" not in draft
     assert "監視件数:550件" in draft
     assert "12346万円" in draft or "12345万円" in draft
+    assert "#マンション相場" in draft
     assert len(draft) <= 280

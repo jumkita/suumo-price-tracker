@@ -340,10 +340,10 @@ def render_html(
 
     summary_diff = DiffResult(
         price_drops=drops,
-        price_rises=[],
+        price_rises=list(comparison.rises) if comparison is not None else [],
         new_listings=[],
         removed_listings=[],
-        unchanged_count=0,
+        unchanged_count=comparison.unchanged_count if comparison is not None else 0,
     )
     draft = build_tweet_draft("東京23区", summary_diff)
     table_js = TABLE_SCRIPT.read_text(encoding="utf-8")
