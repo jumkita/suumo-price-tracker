@@ -366,7 +366,7 @@ def _lead_text(
         and comparison.removed_avg_man < comparison.matched_avg_old
     ):
         parts.append(
-            "全区平均が上がっている場合でも、値上げではなく安い掲載が消えた影響のことがあります。"
+            "全体平均が上がっている場合でも、値上げではなく安い掲載が消えた影響のことがあります。"
         )
     return "".join(parts)
 
@@ -420,7 +420,7 @@ def _can_say_text(
 
 def _cannot_say_text(comparison: CitywideComparison) -> str:
     return (
-        "23区全体が下落局面に入ったこと、翌日も同じペースであること、"
+        "東京23区・市部全体が下落局面に入ったこと、翌日も同じペースであること、"
         f"離脱{comparison.removed_count}件がすべて成約だということは、この1日だけでは言えません。"
     )
 
@@ -520,11 +520,11 @@ def format_insight_markdown(insight: DailyInsight) -> str:
         for bucket in insight.drop_size_buckets:
             lines.append(f"- {bucket.label}: {bucket.count}件")
     if insight.ward_rates:
-        lines.extend(["", "## 区ごとの値下げ率（上位）", ""])
+        lines.extend(["", "## エリアごとの値下げ率（上位）", ""])
         for item in insight.ward_rates:
             lines.append(f"- {item.label}: {item.rate_pct:.2f}%（{item.count}件）")
     if insight.ward_yen:
-        lines.extend(["", "## 区ごとの値下げ総額（上位）", ""])
+        lines.extend(["", "## エリアごとの値下げ総額（上位）", ""])
         for item in insight.ward_yen:
             lines.append(f"- {item.label}: {format_man(item.yen)}")
     if insight.largest_drops:
@@ -616,7 +616,7 @@ def _html_rate_bars(rates: tuple[RateShare, ...]) -> str:
             f'<span class="insight-bar-fill" style="width:{width:.1f}%"></span>'
             "</span></div>"
         )
-    return "<h3>区ごとの値下げ率（上位）</h3>" + "".join(rows)
+    return "<h3>エリアごとの値下げ率（上位）</h3>" + "".join(rows)
 
 
 def _html_yen_list(rows: tuple[YenShare, ...]) -> str:
@@ -626,7 +626,7 @@ def _html_yen_list(rows: tuple[YenShare, ...]) -> str:
         f"<li>{html.escape(item.label)}: {html.escape(format_man(item.yen))}</li>"
         for item in rows
     )
-    return f"<h3>区ごとの値下げ総額（上位）</h3><ul>{items}</ul>"
+    return f"<h3>エリアごとの値下げ総額（上位）</h3><ul>{items}</ul>"
 
 
 def _html_largest(rows: tuple[DropHighlight, ...]) -> str:

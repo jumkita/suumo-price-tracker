@@ -36,6 +36,7 @@ from src.property_history import (
 )
 from src.scraper.suumo import default_fetch
 from src.tweet_draft import build_tweet_draft
+from src.wards import CITYWIDE_AREA_LABEL
 
 PUBLISH_DIR = ROOT / "data" / "published"
 SITE_DIR = ROOT / "site"
@@ -345,7 +346,7 @@ def render_html(
         removed_listings=[],
         unchanged_count=comparison.unchanged_count if comparison is not None else 0,
     )
-    draft = build_tweet_draft("東京23区", summary_diff)
+    draft = build_tweet_draft(CITYWIDE_AREA_LABEL, summary_diff)
     table_js = TABLE_SCRIPT.read_text(encoding="utf-8")
 
     return f"""<!DOCTYPE html>
@@ -543,13 +544,13 @@ def render_html(
 <body>
   <header>
     <h1>SUUMO価格トラッキング</h1>
-    <p class="sub">更新日 {_escape(snapshot_date)} / {config_count}区 / {listing_count}件<br/>生成 {_escape(generated_at)}</p>
+    <p class="sub">更新日 {_escape(snapshot_date)} / {config_count}エリア / {listing_count}件<br/>生成 {_escape(generated_at)}</p>
   </header>
   <main>
     <section class="card">
       <div class="metrics">
         <div><span class="label">値下げ件数</span><strong>{len(drops)}</strong></div>
-        <div><span class="label">監視区数</span><strong>{config_count}</strong></div>
+        <div><span class="label">監視エリア数</span><strong>{config_count}</strong></div>
         <div><span class="label">監視物件数</span><strong>{listing_count}</strong></div>
         <div><span class="label">更新日</span><strong>{_escape(snapshot_date)}</strong></div>
       </div>
@@ -558,12 +559,12 @@ def render_html(
     {insight_html}
 
     <section class="card">
-      <h2>X投稿下書き（23区まとめて）</h2>
+      <h2>X投稿下書き（23区+市部まとめて）</h2>
       <pre class="draft">{_escape(draft)}</pre>
     </section>
 
     <section class="card">
-      <h2>値下げ一覧（全区横断）</h2>
+      <h2>値下げ一覧（全エリア横断）</h2>
       <p class="sub">物件名・住所・価格履歴・最寄り駅は文字検索。価格は1000万円単位、駅徒歩は分数、面積は10m2単位で絞り込めます。表示 <span id="drops-visible-count">{len(drops)}</span> / {len(drops)}件</p>
       {_sort_bar()}
       <div class="table-wrap"><table id="drops-table">

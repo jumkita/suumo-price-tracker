@@ -70,7 +70,7 @@ if sync_cols[1].button("最新データを読み込み", type="primary"):
             result = sync_from_remote(remote_url)
             st.success(
                 f"取込完了: {result.snapshot_date} / "
-                f"{result.config_count}区 / {result.listing_count}件"
+                f"{result.config_count}エリア / {result.listing_count}件"
             )
             st.rerun()
         except Exception as exc:  # noqa: BLE001
@@ -138,14 +138,14 @@ def render_dashboard() -> None:
     histories = load_histories()
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("監視区数", len(configs))
+    col1.metric("監視エリア数", len(configs))
     total_listings = 0
     for config in configs:
         snaps = list_snapshots(config.id)
         if snaps:
             total_listings += snaps[0].listing_count
     col2.metric("最新件数（合計）", total_listings)
-    col3.metric("値下げ（全区）", len(drops))
+    col3.metric("値下げ（全エリア）", len(drops))
 
     insight = load_daily_insight()
     if insight:
@@ -155,7 +155,7 @@ def render_dashboard() -> None:
         )
         st.markdown(insight.get("markdown") or "")
 
-    st.subheader("値下げ一覧（全区横断）")
+    st.subheader("値下げ一覧（全エリア横断）")
     snapshot_date = ""
     for config in configs:
         snaps = list_snapshots(config.id)

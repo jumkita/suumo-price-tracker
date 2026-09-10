@@ -1,4 +1,4 @@
-"""Register Tokyo 23 ward watch configs (idempotent by name)."""
+"""Register Tokyo 23 ward and Tama-city watch configs (idempotent by name)."""
 
 from __future__ import annotations
 
@@ -11,19 +11,19 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.db import add_watch_config, get_connection, init_db, list_watch_configs
-from src.wards import all_ward_watches
+from src.wards import all_tokyo_watches
 
 
 def ensure_wards(max_pages: int = 50, db_path: Path | None = None) -> list[int]:
     init_db(db_path)
     existing = {c.name: c for c in list_watch_configs(db_path=db_path)}
     created_ids: list[int] = []
-    for ward in all_ward_watches():
-        current = existing.get(ward.name)
+    for area in all_tokyo_watches():
+        current = existing.get(area.name)
         if current is None:
             config_id = add_watch_config(
-                ward.name,
-                ward.search_url,
+                area.name,
+                area.search_url,
                 max_pages=max_pages,
                 db_path=db_path,
             )
@@ -36,13 +36,15 @@ def ensure_wards(max_pages: int = 50, db_path: Path | None = None) -> list[int]:
                 SET search_url = ?, max_pages = ?, enabled = 1
                 WHERE id = ?
                 """,
-                (ward.search_url, max_pages, current.id),
+                (area.search_url, max_pages, current.id),
             )
     return created_ids
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Register Tokyo 23 ward watches")
+    parser = argparse.ArgumentParser(
+        description="Register Tokyo 23 ward and Tama city watches"
+    )
     parser.add_argument("--max-pages", type=int, default=50)
     parser.add_argument("--db", type=Path, default=None)
     args = parser.parse_args()

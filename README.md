@@ -1,6 +1,8 @@
 # SUUMO マンション価格トラッキング
 
-Streamlit / GitHub Pages で SUUMO 中古マンションの価格変動を日次監視するツールです。
+Streamlit / GitHub Pages で SUUMO 中古マンションの価格変動を日次監視するツールです。監視対象は **東京23区と市部（多摩地域の26市）** です。
+
+西多摩郡（瑞穂町・日の出町・檜原村・奥多摩町）は、23区・市部と同じ `sc=` 検索だと SUUMO がエラーページを返すため含めていません。
 
 ## スマホで見る（公開ページ）
 
@@ -34,7 +36,7 @@ DAILY_PRICES_JSON_URL = "https://raw.githubusercontent.com/jumkita/suumo-price-t
 ## 画面での確認（Streamlit）
 
 1. ダッシュボードの **「最新データを読み込み」** でクラウドJSONを取込
-2. 全区の値下げ一覧と、物件ごとの過去価格を確認（文字検索・1000万円/徒歩/面積の絞り込み、昇順降順）。更新のたびに「今日の読み取り」が出ます
+2. 全エリアの値下げ一覧と、物件ごとの過去価格を確認（文字検索・1000万円/徒歩/面積の絞り込み、昇順降順）。更新のたびに「今日の読み取り」が出ます
 3. X投稿下書きで投稿文をコピー
 
 ## クラウド自動更新
@@ -43,6 +45,7 @@ DAILY_PRICES_JSON_URL = "https://raw.githubusercontent.com/jumkita/suumo-price-t
 
 - `Daily SUUMO Price Scrape`: 毎日 **06:30 JST 目安**にスクレイピング（遅延は許容）
 - `Deploy GitHub Pages`: 公開サイトを更新
+- 監視は23区+26市で最大49エリア。`max_pages` は区と同じ50。ジョブ制限は180分です
 
 成果物:
 
@@ -61,6 +64,8 @@ python scripts/bootstrap_previous_day.py --export
 python scripts/build_site.py
 python scripts/sync_from_remote.py
 ```
+
+`register_wards.py` は東京23区と市部26市を名前で冪等登録します（再実行で重複しません）。
 
 ## 同一物件の扱い
 

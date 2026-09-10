@@ -74,7 +74,10 @@ def test_build_site_writes_index(tmp_path: Path) -> None:
     index = build_site(publish, site, enrich_floor=False)
     html = index.read_text(encoding="utf-8")
     assert "SUUMO価格トラッキング" in html
-    assert "値下げ一覧（全区横断）" in html
+    assert "値下げ一覧（全エリア横断）" in html
+    assert "X投稿下書き（23区+市部まとめて）" in html
+    assert "東京23区+市部 中古マンション" in html
+    assert "監視エリア数" in html
     assert "テストマンション" in html
     assert "半蔵門" in html
     assert "徒歩5分" in html

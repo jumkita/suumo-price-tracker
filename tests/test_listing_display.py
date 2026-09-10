@@ -14,6 +14,7 @@ from src.listing_display import (
 
 def test_ward_label_strips_watch_suffix() -> None:
     assert ward_label("千代田区 中古マンション") == "千代田区"
+    assert ward_label("八王子市 中古マンション") == "八王子市"
     assert ward_label("港区") == "港区"
     assert ward_label("") == "-"
 

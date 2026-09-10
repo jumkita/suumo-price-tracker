@@ -35,7 +35,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Register Tokyo 23 wards
+      - name: Register Tokyo 23 wards and Tama cities
         run: python scripts/register_wards.py --max-pages "${MAX_PAGES}"
 
       - name: Scrape and store snapshots

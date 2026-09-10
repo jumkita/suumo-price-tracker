@@ -73,4 +73,7 @@ def test_write_insight_files(tmp_path) -> None:
     json_path, md_path = write_insight_files(tmp_path, current, previous)
     assert json_path.exists()
     assert md_path.exists()
-    assert "今日の読み取り" in md_path.read_text(encoding="utf-8")
+    markdown = md_path.read_text(encoding="utf-8")
+    assert "今日の読み取り" in markdown
+    assert "東京23区・市部全体が下落局面" in markdown
+    assert "23区全体が下落局面" not in markdown

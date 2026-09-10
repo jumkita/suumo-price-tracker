@@ -48,7 +48,7 @@ if st.button("最新クラウドデータを取り込む", type="primary"):
         try:
             result = sync_from_remote(remote_url)
             st.success(
-                f"{result.snapshot_date}: {result.config_count}区 / {result.listing_count}件"
+                f"{result.snapshot_date}: {result.config_count}エリア / {result.listing_count}件"
             )
         except Exception as exc:  # noqa: BLE001
             st.error(f"失敗: {exc}")

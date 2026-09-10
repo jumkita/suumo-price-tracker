@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from src.diff import DiffResult, format_man
+from src.wards import CITYWIDE_AREA_LABEL, region_hashtags
 
 DEFAULT_MAX_CHARS = 280
 
@@ -19,7 +20,7 @@ def build_first_day_draft(
         f"{_header(area_label)}\n"
         f"監視件数:{listing_count}件 / 平均:{avg_text}\n"
         f"初回取得のため変動比較は翌日以降です。\n"
-        f"{_hashtags(has_drops=False)}"
+        f"{_hashtags(area_label, has_drops=False)}"
     )
     return _trim(body, max_chars)
 
@@ -32,7 +33,7 @@ def build_tweet_draft(
 ) -> str:
     header = _header(area_label)
     summary = f"値下げ:{diff.drop_count}件 / 値上げ:{diff.rise_count}件"
-    tags = _hashtags(has_drops=diff.drop_count > 0)
+    tags = _hashtags(area_label, has_drops=diff.drop_count > 0)
 
     if diff.drop_count == 0 and diff.new_count == 0 and diff.rise_count == 0:
         body = f"{header}\n{summary}\n目立った価格変動はありませんでした。\n{tags}"
@@ -58,14 +59,14 @@ def build_tweet_draft(
 
 
 def _header(area_label: str) -> str:
-    text = (area_label or "").strip() or "東京23区"
+    text = (area_label or "").strip() or CITYWIDE_AREA_LABEL
     if "中古マンション" in text:
         return text
     return f"{text} 中古マンション"
 
 
-def _hashtags(*, has_drops: bool) -> str:
-    tags = ["#中古マンション", "#東京23区"]
+def _hashtags(area_label: str, *, has_drops: bool) -> str:
+    tags = ["#中古マンション", *region_hashtags(area_label)]
     if has_drops:
         tags.append("#値下げ")
     else:
