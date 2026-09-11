@@ -78,6 +78,7 @@ def test_build_site_writes_index(tmp_path: Path) -> None:
     assert "X投稿下書き（23区+市部まとめて）" in html
     assert "東京23区+市部 中古マンション" in html
     assert "監視エリア数" in html
+    assert "監視エリア" in html
     assert "テストマンション" in html
     assert "半蔵門" in html
     assert "徒歩5分" in html
@@ -154,3 +155,93 @@ def test_filter_options_sort_price_and_area_numerically() -> None:
     assert options["old"] == ["2000万円〜3000万円", "20億円〜20億1000万円"]
     assert options["new"] == ["2000万円〜3000万円", "19億円〜19億1000万円"]
     assert options["area"] == ["20〜30m2", "120〜130m2"]
+
+
+def test_build_site_lists_new_city_without_price_drop(tmp_path: Path) -> None:
+    publish = tmp_path / "published"
+    site = tmp_path / "site"
+    publish.mkdir()
+    city_listing = {
+        "property_id": "fp_city",
+        "name": "市部マンション",
+        "address": "東京都八王子市",
+        "price_man": 3200,
+        "area_sqm": 55.0,
+        "layout": "2LDK",
+        "built_year": "2005年",
+        "station": "京王線「京王八王子」徒歩8分",
+        "walk_minutes": 8,
+        "floor": "5階",
+        "url": "https://suumo.jp/ms/chuko/tokyo/sc_hachioji/nc_1/",
+    }
+    ward_listing = {
+        "property_id": "fp1",
+        "name": "テストマンション",
+        "address": "東京都千代田区",
+        "price_man": 4800,
+        "area_sqm": 60.0,
+        "layout": "2LDK",
+        "built_year": "2010年",
+        "station": "東京メトロ半蔵門線「半蔵門」徒歩5分",
+        "walk_minutes": 5,
+        "floor": "3階",
+        "url": "https://suumo.jp/x",
+    }
+    current = {
+        "snapshot_date": "2026-09-11",
+        "generated_at": "2026-09-11T08:00:00+09:00",
+        "config_count": 2,
+        "listing_count": 2,
+        "configs": [
+            {
+                "name": "千代田区 中古マンション",
+                "search_url": "https://suumo.jp/x",
+                "max_pages": 1,
+                "enabled": True,
+                "listing_count": 1,
+                "fetched_at": "2026-09-11T08:00:00",
+                "listings": [ward_listing],
+            },
+            {
+                "name": "八王子市 中古マンション",
+                "search_url": "https://suumo.jp/y",
+                "max_pages": 1,
+                "enabled": True,
+                "listing_count": 1,
+                "fetched_at": "2026-09-11T08:00:00",
+                "listings": [city_listing],
+            },
+        ],
+    }
+    previous = {
+        "snapshot_date": "2026-09-10",
+        "generated_at": "2026-09-10T08:00:00+09:00",
+        "config_count": 1,
+        "listing_count": 1,
+        "configs": [
+            {
+                **current["configs"][0],
+                "listings": [{**ward_listing, "price_man": 5000}],
+            }
+        ],
+    }
+    (publish / "daily_prices.json").write_text(
+        json.dumps(current, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (publish / "daily_prices_2026-09-10.json").write_text(
+        json.dumps(previous, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (publish / "daily_prices_2026-09-11.json").write_text(
+        json.dumps(current, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    html = build_site(publish, site, enrich_floor=False).read_text(encoding="utf-8")
+    assert "八王子市 1件" in html
+    assert "市部" in html
+    assert "新規監視" in html
+    assert "市部マンション" not in html
+    assert "テストマンション" in html
+    assert "値下げ一覧は前日比で下がった物件のみ" in html
+

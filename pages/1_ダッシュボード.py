@@ -42,6 +42,7 @@ from src.property_history import (
     history_for_listing,
 )
 from src.remote_sync import resolve_remote_json_url, sync_from_remote
+from src.wards import classify_tokyo_area
 
 st.set_page_config(page_title="ダッシュボード", page_icon="📊", layout="wide")
 init_db()
@@ -49,7 +50,8 @@ init_db()
 st.title("ダッシュボード")
 st.caption(
     "データは GitHub Actions が日次更新します。"
-    "値下げは行政区を分けず、物件ごとの過去価格をすべて表示します。"
+    "監視は東京23区と市部です。値下げは前日比がある物件のみで、"
+    "新規エリアの値下げ行は翌日以降になります。"
 )
 
 
@@ -147,6 +149,31 @@ def render_dashboard() -> None:
     col2.metric("最新件数（合計）", total_listings)
     col3.metric("値下げ（全エリア）", len(drops))
 
+    kind_label = {"ward": "23区", "city": "市部", "other": "その他"}
+    coverage_rows = []
+    for config in configs:
+        snaps = list_snapshots(config.id)
+        coverage_rows.append(
+            {
+                "行政区": ward_label(config.name),
+                "区分": kind_label[classify_tokyo_area(config.name)],
+                "件数": snaps[0].listing_count if snaps else 0,
+            }
+        )
+    city_count = sum(1 for row in coverage_rows if row["区分"] == "市部")
+    city_listings = sum(row["件数"] for row in coverage_rows if row["区分"] == "市部")
+    st.subheader("監視エリア")
+    st.caption(
+        f"市部 {city_count}市 / {city_listings}件を含みます。"
+        "件数が出ない場合は「最新データを読み込み」を押してください。"
+        "値下げ表は前日比がある物件のみです。"
+    )
+    st.dataframe(
+        pd.DataFrame(coverage_rows),
+        use_container_width=True,
+        hide_index=True,
+    )
+
     insight = load_daily_insight()
     if insight:
         st.subheader("今日の読み取り")
@@ -156,6 +183,7 @@ def render_dashboard() -> None:
         st.markdown(insight.get("markdown") or "")
 
     st.subheader("値下げ一覧（全エリア横断）")
+    st.caption("前日比で下がった物件のみ。市部を含む全エリアの件数は上の監視エリアを見てください。")
     snapshot_date = ""
     for config in configs:
         snaps = list_snapshots(config.id)

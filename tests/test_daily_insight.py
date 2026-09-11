@@ -77,3 +77,45 @@ def test_write_insight_files(tmp_path) -> None:
     assert "今日の読み取り" in markdown
     assert "東京23区・市部全体が下落局面" in markdown
     assert "23区全体が下落局面" not in markdown
+
+
+def test_new_city_watch_is_explained_in_caveat() -> None:
+    previous = {
+        "snapshot_date": "2026-09-10",
+        "listing_count": 1,
+        "config_count": 1,
+        "configs": [
+            {
+                "name": "千代田区 中古マンション",
+                "listings": [_listing(1, 5000)],
+            }
+        ],
+    }
+    current = {
+        "snapshot_date": "2026-09-11",
+        "listing_count": 2,
+        "config_count": 2,
+        "configs": [
+            {
+                "name": "千代田区 中古マンション",
+                "listings": [_listing(1, 5000)],
+            },
+            {
+                "name": "八王子市 中古マンション",
+                "listings": [
+                    {
+                        **_listing(2, 3000),
+                        "address": "東京都八王子市",
+                        "url": "https://suumo.jp/ms/chuko/tokyo/sc_hachioji/nc_2/",
+                    }
+                ],
+            },
+        ],
+    }
+    insight = build_daily_insight(current, previous)
+    assert "市部1市（1件）" in insight.caveat
+    assert "新規監視" in insight.caveat
+    assert "翌日以降" in insight.caveat
+    markdown = format_insight_markdown(insight)
+    assert "市部1市（1件）" in markdown
+

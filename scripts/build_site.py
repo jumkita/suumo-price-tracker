@@ -36,7 +36,7 @@ from src.property_history import (
 )
 from src.scraper.suumo import default_fetch
 from src.tweet_draft import build_tweet_draft
-from src.wards import CITYWIDE_AREA_LABEL
+from src.wards import CITYWIDE_AREA_LABEL, AreaCoverage, coverage_from_payload
 
 PUBLISH_DIR = ROOT / "data" / "published"
 SITE_DIR = ROOT / "site"
@@ -137,6 +137,40 @@ def _header_row() -> str:
             "</span></th>"
         )
     return "<tr>" + "".join(cells) + "</tr>"
+
+
+def _coverage_group(title: str, rows: list[AreaCoverage]) -> str:
+    if not rows:
+        return ""
+    items = "".join(
+        f"<li>{_escape(item.label)} {_escape(item.listing_count)}件</li>" for item in rows
+    )
+    total = sum(item.listing_count for item in rows)
+    return (
+        "<div>"
+        f"<h3>{_escape(title)}</h3>"
+        f'<p class="sub">{len(rows)}エリア / {total}件</p>'
+        f"<ul>{items}</ul>"
+        "</div>"
+    )
+
+
+def _coverage_section(current: dict) -> str:
+    rows = coverage_from_payload(current)
+    wards = [item for item in rows if item.kind == "ward"]
+    cities = [item for item in rows if item.kind == "city"]
+    others = [item for item in rows if item.kind == "other"]
+    return (
+        '<section class="card">'
+        "<h2>監視エリア</h2>"
+        '<p class="sub">値下げ一覧は前日比で下がった物件のみです。'
+        "市部を含む全エリアの件数はここに出ます。</p>"
+        '<div class="area-lists">'
+        f"{_coverage_group('23区', wards)}"
+        f"{_coverage_group('市部', cities)}"
+        f"{_coverage_group('その他', others)}"
+        "</div></section>"
+    )
 
 
 def _sort_bar() -> str:
@@ -338,6 +372,7 @@ def render_html(
     drop_rows = _drop_rows(drops, histories, day)
     insight = build_daily_insight(current, previous, comparison)
     insight_html = render_insight_html(insight)
+    coverage_html = _coverage_section(current)
 
     summary_diff = DiffResult(
         price_drops=drops,
@@ -390,6 +425,21 @@ def render_html(
       border-radius: 16px;
       padding: 1rem;
       margin: 0 0 1rem;
+    }}
+    .area-lists {{
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.85rem;
+    }}
+    .area-lists h3 {{
+      margin: 0 0 0.2rem;
+      font-size: 0.95rem;
+    }}
+    .area-lists ul {{
+      margin: 0.35rem 0 0;
+      padding-left: 1.15rem;
+      columns: 2;
+      font-size: 0.82rem;
     }}
     .metrics {{
       display: grid;
@@ -537,6 +587,7 @@ def render_html(
     }}
     @media (min-width: 720px) {{
       .metrics {{ grid-template-columns: repeat(4, minmax(0, 1fr)); }}
+      .area-lists {{ grid-template-columns: 1fr 1fr; }}
       h1 {{ font-size: 1.7rem; }}
     }}
   </style>
@@ -558,6 +609,8 @@ def render_html(
 
     {insight_html}
 
+    {coverage_html}
+
     <section class="card">
       <h2>X投稿下書き（23区+市部まとめて）</h2>
       <pre class="draft">{_escape(draft)}</pre>
@@ -565,7 +618,7 @@ def render_html(
 
     <section class="card">
       <h2>値下げ一覧（全エリア横断）</h2>
-      <p class="sub">物件名・住所・価格履歴・最寄り駅は文字検索。価格は1000万円単位、駅徒歩は分数、面積は10m2単位で絞り込めます。表示 <span id="drops-visible-count">{len(drops)}</span> / {len(drops)}件</p>
+      <p class="sub">前日比で下がった物件のみ。市部を含む全エリアの件数は上の監視エリアを見てください。物件名・住所・価格履歴・最寄り駅は文字検索。価格は1000万円単位、駅徒歩は分数、面積は10m2単位で絞り込めます。表示 <span id="drops-visible-count">{len(drops)}</span> / {len(drops)}件</p>
       {_sort_bar()}
       <div class="table-wrap"><table id="drops-table">
         <thead>

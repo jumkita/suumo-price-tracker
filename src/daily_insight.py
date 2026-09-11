@@ -13,6 +13,7 @@ from typing import Any, Literal, Never
 from src.citywide import CitywideComparison, compare_citywide
 from src.diff import PriceChange, format_man
 from src.listing_display import ward_label
+from src.wards import classify_tokyo_area
 
 HeadlineKind = Literal[
     "first_day",
@@ -371,22 +372,52 @@ def _lead_text(
     return "".join(parts)
 
 
+def _new_watch_note(comparison: CitywideComparison) -> str:
+    new_areas = [
+        item for item in comparison.wards if item.prev_count == 0 and item.cur_count > 0
+    ]
+    if not new_areas:
+        return ""
+    cities = [item for item in new_areas if classify_tokyo_area(item.ward) == "city"]
+    wards = [item for item in new_areas if classify_tokyo_area(item.ward) == "ward"]
+    parts: list[str] = []
+    if cities:
+        parts.append(
+            f"市部{len(cities)}市（{sum(item.cur_count for item in cities)}件）"
+        )
+    if wards:
+        parts.append(
+            f"23区{len(wards)}区（{sum(item.cur_count for item in wards)}件）"
+        )
+    others = [item for item in new_areas if classify_tokyo_area(item.ward) == "other"]
+    if others:
+        parts.append(
+            f"その他{len(others)}エリア（{sum(item.cur_count for item in others)}件）"
+        )
+    return (
+        f" {'、'.join(parts)}を新規監視に含めました。"
+        "値下げ一覧は前日比がある物件のみのため、新規エリアの値下げ行は翌日以降です。"
+    )
+
+
 def _caveat_text(
     comparison: CitywideComparison,
     previous_date: str | None,
     snapshot_date: str,
 ) -> str:
     span = f"{previous_date or '-'} → {snapshot_date} の1日比較です。"
+    new_note = _new_watch_note(comparison)
     if comparison.prev_listing_count <= 0:
-        return span + " 掲載件数の変化はまだ評価できません。"
+        return span + " 掲載件数の変化はまだ評価できません。" + new_note
     shift = abs(comparison.cur_listing_count - comparison.prev_listing_count)
     shift_pct = 100.0 * shift / comparison.prev_listing_count
     if shift_pct >= INVENTORY_SHIFT_PCT:
         return (
             f"{span} 掲載件数は {comparison.prev_listing_count} → {comparison.cur_listing_count} "
             f"と {shift_pct:.0f}% 動いており、市況そのものより取得範囲・掲載入れ替わりの影響が大きい可能性があります。"
+            f"{new_note}"
         )
-    return span + " 数日分が揃うまで、トレンド判断には使いすぎないでください。"
+    return span + " 数日分が揃うまで、トレンド判断には使いすぎないでください。" + new_note
 
 
 def _can_say_text(

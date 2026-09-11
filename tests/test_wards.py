@@ -14,6 +14,8 @@ from src.wards import (
     all_tokyo_watches,
     all_ward_watches,
     build_ward_search_url,
+    classify_tokyo_area,
+    coverage_from_payload,
     region_hashtags,
 )
 
@@ -121,3 +123,25 @@ def test_region_hashtags_match_area() -> None:
     assert region_hashtags("千代田区") == ("#東京23区",)
     assert region_hashtags("八王子市 中古マンション") == ("#東京市部",)
     assert region_hashtags("東京23区") == ("#東京23区",)
+
+
+def test_classify_tokyo_area_distinguishes_ward_and_city() -> None:
+    assert classify_tokyo_area("千代田区 中古マンション") == "ward"
+    assert classify_tokyo_area("八王子市") == "city"
+    assert classify_tokyo_area("西東京市 中古マンション") == "city"
+    assert classify_tokyo_area("") == "other"
+    assert classify_tokyo_area(CITYWIDE_AREA_LABEL) == "other"
+
+
+def test_coverage_from_payload_lists_cities() -> None:
+    payload = {
+        "configs": [
+            {"name": "千代田区 中古マンション", "listing_count": 10, "listings": []},
+            {"name": "八王子市 中古マンション", "listing_count": 0, "listings": [{}, {}]},
+        ]
+    }
+    rows = coverage_from_payload(payload)
+    assert [(item.label, item.listing_count, item.kind) for item in rows] == [
+        ("千代田区", 10, "ward"),
+        ("八王子市", 2, "city"),
+    ]

@@ -10,7 +10,7 @@ Streamlit / GitHub Pages で SUUMO 中古マンションの価格変動を日次
 - **リポジトリ:** https://github.com/jumkita/suumo-price-tracker
 - **日次JSON:** https://raw.githubusercontent.com/jumkita/suumo-price-tracker/main/data/published/daily_prices.json
 
-Pages は公開リポジトリの Actions が毎日更新します。
+Pages は公開リポジトリの Actions が毎日更新します。公開ページの **監視エリア** に23区と市部の件数が並びます。**値下げ一覧** は前日比で下がった物件だけなので、市部を足した初日は値下げ行が空でも、監視件数には入っています。
 
 ## 前提条件
 
@@ -65,7 +65,7 @@ python scripts/build_site.py
 python scripts/sync_from_remote.py
 ```
 
-`register_wards.py` は東京23区と市部26市を名前で冪等登録します（再実行で重複しません）。
+`register_wards.py` は東京23区と市部26市を名前で冪等登録します（再実行で重複しません）。市部の URL だけ試す場合は、Streamlit の監視設定から対象市を選んで「今すぐ取得（ローカル）」を実行します。
 
 ## 同一物件の扱い
 

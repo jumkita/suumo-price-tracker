@@ -116,10 +116,10 @@ def compare_citywide(
     for block in current.get("configs") or []:
         ward_name = str(block.get("name") or "")
         prev_block = prev_map.get(ward_name)
-        if prev_block is None:
-            continue
         current_rows = _rows(block)
-        previous_rows = _rows(prev_block)
+        previous_rows = _rows(prev_block) if prev_block is not None else []
+        if not current_rows and not previous_rows:
+            continue
         diff = compare_listings(previous_rows, current_rows, ward_name=ward_name)
         drops.extend(diff.price_drops)
         rises.extend(diff.price_rises)

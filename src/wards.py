@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any, Literal
 
 from src.scraper.suumo import normalize_search_url
 
@@ -71,6 +72,7 @@ TOKYO_CITIES: tuple[tuple[str, str], ...] = (
 # 23区・市部と同じ中古マンション検索 URL だと SUUMO がエラーページを返すため対象外。
 
 WATCH_NAME_SUFFIX = " 中古マンション"
+AreaKind = Literal["ward", "city", "other"]
 
 
 @dataclass(frozen=True)
@@ -78,6 +80,13 @@ class WardWatch:
     name: str
     ward_code: str
     search_url: str
+
+
+@dataclass(frozen=True)
+class AreaCoverage:
+    label: str
+    listing_count: int
+    kind: AreaKind
 
 
 def build_ward_search_url(ward_code: str) -> str:
@@ -111,6 +120,47 @@ def all_city_watches() -> list[WardWatch]:
 
 def all_tokyo_watches() -> list[WardWatch]:
     return all_ward_watches() + all_city_watches()
+
+
+def area_core_name(area_label: str) -> str:
+    text = (area_label or "").strip()
+    if text.endswith(WATCH_NAME_SUFFIX):
+        text = text[: -len(WATCH_NAME_SUFFIX)].strip()
+    return text
+
+
+def classify_tokyo_area(area_label: str) -> AreaKind:
+    core = area_core_name(area_label)
+    if not core:
+        return "other"
+    for ward_name, _ward_code in TOKYO_23_WARDS:
+        if core == ward_name or core.startswith(ward_name):
+            return "ward"
+    for city_name, _city_code in TOKYO_CITIES:
+        if core == city_name or core.startswith(city_name):
+            return "city"
+    if core.endswith("区"):
+        return "ward"
+    if core.endswith("市"):
+        return "city"
+    return "other"
+
+
+def coverage_from_payload(payload: dict[str, Any]) -> list[AreaCoverage]:
+    rows: list[AreaCoverage] = []
+    for block in payload.get("configs") or []:
+        label = area_core_name(str(block.get("name") or "")) or "-"
+        count = int(block.get("listing_count") or 0)
+        if count <= 0:
+            count = len(block.get("listings") or [])
+        rows.append(
+            AreaCoverage(
+                label=label,
+                listing_count=count,
+                kind=classify_tokyo_area(label),
+            )
+        )
+    return rows
 
 
 def region_hashtags(area_label: str) -> tuple[str, ...]:
