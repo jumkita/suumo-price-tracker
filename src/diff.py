@@ -155,3 +155,71 @@ def format_man(value: int | None) -> str:
             return f"{oku}億円"
         return f"{oku}億{man}万円"
     return f"{value}万円"
+
+
+HIGHLIGHT_RATE_DECIMALS = 1
+
+
+def drop_rate_pct(change: PriceChange) -> float | None:
+    """Return the old→new drop as a percent of the old price.
+
+    Price rises, missing prices, and a zero/negative old price are excluded
+    so ranking never divides by zero or treats an increase as a highlight.
+    """
+    old = change.old_price_man
+    new = change.new_price_man
+    if old is None or old <= 0 or new is None:
+        return None
+    delta = change.delta_man if change.delta_man is not None else new - old
+    if delta >= 0:
+        return None
+    return (-delta / old) * 100
+
+
+def select_highlight_drops(
+    drops: list[PriceChange],
+    limit: int,
+) -> list[PriceChange]:
+    """Pick notable drops by rate, then by amount, then by name."""
+    eligible = [item for item in drops if drop_rate_pct(item) is not None]
+    eligible.sort(key=_highlight_sort_key)
+    return eligible[:limit]
+
+
+def format_highlight_change(change: PriceChange) -> str:
+    return format_drop_highlight_text(
+        old_price_man=change.old_price_man,
+        new_price_man=change.new_price_man,
+        delta_man=change.delta_man,
+        drop_pct=drop_rate_pct(change),
+    )
+
+
+def format_drop_highlight_text(
+    *,
+    old_price_man: int | None,
+    new_price_man: int | None,
+    delta_man: int | None,
+    drop_pct: float | None,
+) -> str:
+    price_span = f"{format_man(old_price_man)}→{format_man(new_price_man)}"
+    amount = _signed_delta_man(delta_man)
+    if drop_pct is None:
+        return f"{price_span}（{amount}）"
+    return f"{price_span}（△{drop_pct:.{HIGHLIGHT_RATE_DECIMALS}f}% / {amount}）"
+
+
+def _highlight_sort_key(item: PriceChange) -> tuple[float, int, str]:
+    rate = drop_rate_pct(item) or 0.0
+    amount = item.delta_man if item.delta_man is not None else 0
+    return (-rate, amount, item.name)
+
+
+def _signed_delta_man(delta_man: int | None) -> str:
+    if delta_man is None:
+        return "-"
+    if delta_man < 0:
+        return f"-{format_man(-delta_man)}"
+    if delta_man > 0:
+        return f"+{format_man(delta_man)}"
+    return format_man(0)

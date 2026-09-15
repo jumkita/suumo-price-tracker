@@ -113,6 +113,10 @@ def test_build_site_writes_index(tmp_path: Path) -> None:
     assert "すべて" in html
     assert "今日の読み取り" in html
     assert "値下げが広め" in html
+    assert "値下げ率が大きい物件" in html
+    assert "値下げ額が大きい物件" not in html
+    assert "△4.0%" in html
+    assert "注目: テストマンション" in html
 
 
 def test_filter_options_sort_price_and_area_numerically() -> None:

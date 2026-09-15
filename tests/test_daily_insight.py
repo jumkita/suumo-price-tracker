@@ -5,6 +5,7 @@ from __future__ import annotations
 from src.daily_insight import (
     build_daily_insight,
     format_insight_markdown,
+    render_insight_html,
     write_insight_files,
 )
 
@@ -118,4 +119,24 @@ def test_new_city_watch_is_explained_in_caveat() -> None:
     assert "翌日以降" in insight.caveat
     markdown = format_insight_markdown(insight)
     assert "市部1市（1件）" in markdown
+
+
+def test_highlights_prefer_drop_rate_over_amount() -> None:
+    previous = _payload("2026-09-07", [20000, 3000])
+    current = _payload("2026-09-08", [18000, 2400])
+    insight = build_daily_insight(current, previous)
+    assert [item.name for item in insight.largest_drops] == [
+        "テストマンション2",
+        "テストマンション1",
+    ]
+    assert insight.largest_drops[0].drop_pct == 20.0
+    assert insight.largest_drops[1].drop_pct == 10.0
+    markdown = format_insight_markdown(insight)
+    assert "値下げ率が大きい物件" in markdown
+    assert "値下げ額が大きい物件" not in markdown
+    assert "△20.0% / -600万円" in markdown
+    assert "△10.0% / -2000万円" in markdown
+    html = render_insight_html(insight)
+    assert "値下げ率が大きい物件" in html
+    assert "△20.0%" in html
 

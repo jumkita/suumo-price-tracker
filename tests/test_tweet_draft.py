@@ -58,6 +58,59 @@ def test_build_tweet_draft_with_drop() -> None:
     assert "5980万円→5780万円" in draft
     assert "#中古マンション #東京23区 #東京市部 #値下げ" in draft
     assert "#不動産" not in draft
+    assert "△3.3%" in draft
+    assert "-200万円" in draft
+    assert len(draft) <= 280
+
+
+def test_build_tweet_draft_highlights_higher_rate_not_higher_amount() -> None:
+    expensive_small_rate = PriceChange(
+        property_id="hi",
+        name="高額少額率タワー",
+        old_price_man=20000,
+        new_price_man=18000,
+        delta_man=-2000,
+        url="https://suumo.jp/x",
+        address="",
+        station="",
+    )
+    cheap_high_rate = PriceChange(
+        property_id="lo",
+        name="低額高率コート",
+        old_price_man=3000,
+        new_price_man=2400,
+        delta_man=-600,
+        url="https://suumo.jp/y",
+        address="",
+        station="",
+    )
+    invalid_old = PriceChange(
+        property_id="zero",
+        name="旧価格ゼロ",
+        old_price_man=0,
+        new_price_man=100,
+        delta_man=100,
+        url="https://suumo.jp/z",
+        address="",
+        station="",
+    )
+    diff = DiffResult(
+        price_drops=[expensive_small_rate, cheap_high_rate, invalid_old],
+        price_rises=[],
+        new_listings=[],
+        removed_listings=[],
+        unchanged_count=0,
+    )
+    draft = build_tweet_draft(CITYWIDE_AREA_LABEL, diff)
+    lines = [line for line in draft.splitlines() if line.startswith("注目:")]
+    assert len(lines) == 2
+    assert "低額高率コート" in lines[0]
+    assert "△20.0%" in lines[0]
+    assert "-600万円" in lines[0]
+    assert "高額少額率タワー" in lines[1]
+    assert "△10.0%" in lines[1]
+    assert "2億円→1億8000万円" in lines[1]
+    assert "旧価格ゼロ" not in draft
     assert len(draft) <= 280
 
 

@@ -11,7 +11,13 @@ from statistics import median
 from typing import Any, Literal, Never
 
 from src.citywide import CitywideComparison, compare_citywide
-from src.diff import PriceChange, format_man
+from src.diff import (
+    PriceChange,
+    drop_rate_pct,
+    format_drop_highlight_text,
+    format_man,
+    select_highlight_drops,
+)
 from src.listing_display import ward_label
 from src.wards import classify_tokyo_area
 
@@ -489,10 +495,7 @@ def _ward_yen(comparison: CitywideComparison) -> tuple[YenShare, ...]:
 
 def _largest_drops(drops: list[PriceChange]) -> tuple[DropHighlight, ...]:
     highlights: list[DropHighlight] = []
-    for item in drops[:TOP_DROP_COUNT]:
-        pct = None
-        if item.old_price_man and item.delta_man:
-            pct = -item.delta_man / item.old_price_man * 100
+    for item in select_highlight_drops(drops, TOP_DROP_COUNT):
         highlights.append(
             DropHighlight(
                 ward=ward_label(item.ward_name),
@@ -500,12 +503,21 @@ def _largest_drops(drops: list[PriceChange]) -> tuple[DropHighlight, ...]:
                 old_price_man=item.old_price_man,
                 new_price_man=item.new_price_man,
                 delta_man=item.delta_man,
-                drop_pct=pct,
+                drop_pct=drop_rate_pct(item),
                 layout=item.layout or "-",
                 area_sqm=item.area_sqm,
             )
         )
     return tuple(highlights)
+
+
+def _highlight_change_text(item: DropHighlight) -> str:
+    return format_drop_highlight_text(
+        old_price_man=item.old_price_man,
+        new_price_man=item.new_price_man,
+        delta_man=item.delta_man,
+        drop_pct=item.drop_pct,
+    )
 
 
 def _man_number(value: float) -> str:
@@ -559,14 +571,9 @@ def format_insight_markdown(insight: DailyInsight) -> str:
         for item in insight.ward_yen:
             lines.append(f"- {item.label}: {format_man(item.yen)}")
     if insight.largest_drops:
-        lines.extend(["", "## 値下げ額が大きい物件", ""])
+        lines.extend(["", "## 値下げ率が大きい物件", ""])
         for item in insight.largest_drops:
-            pct = f" / {item.drop_pct:.1f}%" if item.drop_pct is not None else ""
-            lines.append(
-                f"- {item.ward} {item.name}: "
-                f"{format_man(item.old_price_man)}→{format_man(item.new_price_man)}"
-                f"（{format_man(item.delta_man)}{pct}）"
-            )
+            lines.append(f"- {item.ward} {item.name}: {_highlight_change_text(item)}")
     lines.extend(
         [
             "",
@@ -665,13 +672,10 @@ def _html_largest(rows: tuple[DropHighlight, ...]) -> str:
         return ""
     items = []
     for item in rows:
-        pct = f" / {item.drop_pct:.1f}%" if item.drop_pct is not None else ""
         items.append(
             "<li>"
             f"{html.escape(item.ward)} {html.escape(item.name)}: "
-            f"{html.escape(format_man(item.old_price_man))}→"
-            f"{html.escape(format_man(item.new_price_man))}"
-            f"（{html.escape(format_man(item.delta_man))}{html.escape(pct)}）"
+            f"{html.escape(_highlight_change_text(item))}"
             "</li>"
         )
-    return "<h3>値下げ額が大きい物件</h3><ul>" + "".join(items) + "</ul>"
+    return "<h3>値下げ率が大きい物件</h3><ul>" + "".join(items) + "</ul>"

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from src.diff import DiffResult, format_man
+from src.diff import DiffResult, format_highlight_change, format_man, select_highlight_drops
 from src.wards import CITYWIDE_AREA_LABEL, region_hashtags
 
 DEFAULT_MAX_CHARS = 280
+TWEET_HIGHLIGHT_COUNT = 3
 
 
 def build_first_day_draft(
@@ -40,13 +41,8 @@ def build_tweet_draft(
         return _trim(body, max_chars)
 
     highlight_lines: list[str] = []
-    for drop in diff.price_drops[:3]:
-        delta = drop.delta_man
-        delta_text = format_man(abs(delta)) if delta is not None else "-"
-        highlight_lines.append(
-            f"注目: {drop.name} {format_man(drop.old_price_man)}→{format_man(drop.new_price_man)}"
-            f"（-{delta_text}）"
-        )
+    for drop in select_highlight_drops(diff.price_drops, TWEET_HIGHLIGHT_COUNT):
+        highlight_lines.append(f"注目: {drop.name} {format_highlight_change(drop)}")
 
     if not highlight_lines and diff.new_listings:
         newest = diff.new_listings[0]

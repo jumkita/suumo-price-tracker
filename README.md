@@ -10,7 +10,7 @@ Streamlit / GitHub Pages で SUUMO 中古マンションの価格変動を日次
 - **リポジトリ:** https://github.com/jumkita/suumo-price-tracker
 - **日次JSON:** https://raw.githubusercontent.com/jumkita/suumo-price-tracker/main/data/published/daily_prices.json
 
-Pages は公開リポジトリの Actions が毎日更新します。公開ページの **監視エリア** に23区と市部の件数が並びます。**値下げ一覧** は前日比で下がった物件だけなので、市部を足した初日は値下げ行が空でも、監視件数には入っています。
+Pages は公開リポジトリの Actions が毎日更新します。公開ページの **監視エリア** に23区と市部の件数が並びます。**値下げ一覧** は前日比で下がった物件だけなので、市部を足した初日は値下げ行が空でも、監視件数には入っています。X投稿下書きと「今日の読み取り」の **注目物件** は、値下げ額ではなく **値下げ率**（旧価格比）が大きい順です。率のあとに額も併記します。
 
 ## 前提条件
 
