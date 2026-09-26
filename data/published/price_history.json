@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "point_count": 20,
+  "point_count": 21,
   "points": [
     {
       "snapshot_date": "2026-09-06",
@@ -3539,6 +3539,209 @@
         "西東京市 中古マンション": {
           "listing_count": 164,
           "avg_price_man": 5096.6
+        }
+      }
+    },
+    {
+      "snapshot_date": "2026-09-26",
+      "listing_count": 19710,
+      "avg_price_man": 8920.2,
+      "wards": {
+        "千代田区 中古マンション": {
+          "listing_count": 443,
+          "avg_price_man": 22600.3
+        },
+        "中央区 中古マンション": {
+          "listing_count": 986,
+          "avg_price_man": 11873.4
+        },
+        "港区 中古マンション": {
+          "listing_count": 1071,
+          "avg_price_man": 19380.3
+        },
+        "新宿区 中古マンション": {
+          "listing_count": 965,
+          "avg_price_man": 8650.0
+        },
+        "文京区 中古マンション": {
+          "listing_count": 738,
+          "avg_price_man": 11245.3
+        },
+        "台東区 中古マンション": {
+          "listing_count": 664,
+          "avg_price_man": 8493.8
+        },
+        "墨田区 中古マンション": {
+          "listing_count": 465,
+          "avg_price_man": 7412.3
+        },
+        "江東区 中古マンション": {
+          "listing_count": 1039,
+          "avg_price_man": 8466.0
+        },
+        "品川区 中古マンション": {
+          "listing_count": 1015,
+          "avg_price_man": 11252.4
+        },
+        "目黒区 中古マンション": {
+          "listing_count": 708,
+          "avg_price_man": 12223.1
+        },
+        "大田区 中古マンション": {
+          "listing_count": 772,
+          "avg_price_man": 6157.9
+        },
+        "世田谷区 中古マンション": {
+          "listing_count": 977,
+          "avg_price_man": 7686.3
+        },
+        "渋谷区 中古マンション": {
+          "listing_count": 970,
+          "avg_price_man": 14599.1
+        },
+        "中野区 中古マンション": {
+          "listing_count": 516,
+          "avg_price_man": 8662.6
+        },
+        "杉並区 中古マンション": {
+          "listing_count": 677,
+          "avg_price_man": 6962.6
+        },
+        "豊島区 中古マンション": {
+          "listing_count": 732,
+          "avg_price_man": 9535.6
+        },
+        "北区 中古マンション": {
+          "listing_count": 427,
+          "avg_price_man": 6829.7
+        },
+        "荒川区 中古マンション": {
+          "listing_count": 355,
+          "avg_price_man": 7078.1
+        },
+        "板橋区 中古マンション": {
+          "listing_count": 749,
+          "avg_price_man": 5295.5
+        },
+        "練馬区 中古マンション": {
+          "listing_count": 659,
+          "avg_price_man": 6073.8
+        },
+        "足立区 中古マンション": {
+          "listing_count": 732,
+          "avg_price_man": 4860.8
+        },
+        "葛飾区 中古マンション": {
+          "listing_count": 404,
+          "avg_price_man": 4820.2
+        },
+        "江戸川区 中古マンション": {
+          "listing_count": 518,
+          "avg_price_man": 6345.5
+        },
+        "八王子市 中古マンション": {
+          "listing_count": 506,
+          "avg_price_man": 3435.5
+        },
+        "立川市 中古マンション": {
+          "listing_count": 169,
+          "avg_price_man": 4252.2
+        },
+        "武蔵野市 中古マンション": {
+          "listing_count": 182,
+          "avg_price_man": 8219.2
+        },
+        "三鷹市 中古マンション": {
+          "listing_count": 188,
+          "avg_price_man": 6211.8
+        },
+        "青梅市 中古マンション": {
+          "listing_count": 87,
+          "avg_price_man": 1609.0
+        },
+        "府中市 中古マンション": {
+          "listing_count": 227,
+          "avg_price_man": 4879.1
+        },
+        "昭島市 中古マンション": {
+          "listing_count": 72,
+          "avg_price_man": 3526.3
+        },
+        "調布市 中古マンション": {
+          "listing_count": 180,
+          "avg_price_man": 5579.2
+        },
+        "町田市 中古マンション": {
+          "listing_count": 219,
+          "avg_price_man": 3968.0
+        },
+        "小金井市 中古マンション": {
+          "listing_count": 115,
+          "avg_price_man": 5431.3
+        },
+        "小平市 中古マンション": {
+          "listing_count": 112,
+          "avg_price_man": 4224.6
+        },
+        "日野市 中古マンション": {
+          "listing_count": 89,
+          "avg_price_man": 3189.3
+        },
+        "東村山市 中古マンション": {
+          "listing_count": 105,
+          "avg_price_man": 3070.4
+        },
+        "国分寺市 中古マンション": {
+          "listing_count": 99,
+          "avg_price_man": 6558.8
+        },
+        "国立市 中古マンション": {
+          "listing_count": 76,
+          "avg_price_man": 5645.9
+        },
+        "福生市 中古マンション": {
+          "listing_count": 43,
+          "avg_price_man": 2371.5
+        },
+        "狛江市 中古マンション": {
+          "listing_count": 51,
+          "avg_price_man": 5212.0
+        },
+        "東大和市 中古マンション": {
+          "listing_count": 29,
+          "avg_price_man": 2662.4
+        },
+        "清瀬市 中古マンション": {
+          "listing_count": 25,
+          "avg_price_man": 2719.4
+        },
+        "東久留米市 中古マンション": {
+          "listing_count": 34,
+          "avg_price_man": 2778.2
+        },
+        "武蔵村山市 中古マンション": {
+          "listing_count": 4,
+          "avg_price_man": 1647.5
+        },
+        "多摩市 中古マンション": {
+          "listing_count": 207,
+          "avg_price_man": 3704.3
+        },
+        "稲城市 中古マンション": {
+          "listing_count": 102,
+          "avg_price_man": 3864.5
+        },
+        "羽村市 中古マンション": {
+          "listing_count": 37,
+          "avg_price_man": 1720.9
+        },
+        "あきる野市 中古マンション": {
+          "listing_count": 6,
+          "avg_price_man": 1720.0
+        },
+        "西東京市 中古マンション": {
+          "listing_count": 164,
+          "avg_price_man": 5079.7
         }
       }
     }
