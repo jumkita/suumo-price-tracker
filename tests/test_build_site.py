@@ -74,7 +74,7 @@ def test_build_site_writes_index(tmp_path: Path) -> None:
     index = build_site(publish, site, enrich_floor=False)
     html = index.read_text(encoding="utf-8")
     assert "SUUMO価格トラッキング" in html
-    assert "値下げ一覧（全エリア横断）" in html
+    assert "値下げ一覧" in html
     assert "X投稿下書き（23区+市部まとめて）" in html
     assert "東京23区+市部 中古マンション" in html
     assert "監視エリア数" in html
@@ -113,8 +113,14 @@ def test_build_site_writes_index(tmp_path: Path) -> None:
     assert "すべて" in html
     assert "今日の読み取り" in html
     assert "値下げが広め" in html
-    assert "値下げ率が大きい物件" in html
+    assert "市況の注目（条件なし）" in html
     assert "値下げ額が大きい物件" not in html
+    assert "希望条件" in html
+    assert "あなたの注目" in html
+    assert "ファミリー目安" in html
+    assert "世田谷区" in html
+    assert "値下げ率" in html
+    assert "data-rate-sort" in html
     assert "△4.0%" in html
     assert "注目: テストマンション" in html
 
@@ -248,4 +254,5 @@ def test_build_site_lists_new_city_without_price_drop(tmp_path: Path) -> None:
     assert "市部マンション" not in html
     assert "テストマンション" in html
     assert "値下げ一覧は前日比で下がった物件のみ" in html
+    assert "希望条件" in html
 

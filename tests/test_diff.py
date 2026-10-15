@@ -7,6 +7,7 @@ from src.diff import (
     PriceChange,
     compare_listings,
     drop_rate_pct,
+    format_drop_rate,
     format_highlight_change,
     format_man,
     select_highlight_drops,
@@ -173,3 +174,5 @@ def test_select_highlight_drops_excludes_invalid_and_rises() -> None:
 def test_format_highlight_change_puts_rate_before_amount() -> None:
     change = _change("1", "サンプル", 3000, 2400)
     assert format_highlight_change(change) == "3000万円→2400万円（△20.0% / -600万円）"
+    assert format_drop_rate(20.0) == "△20.0%"
+    assert format_drop_rate(None) == "-"

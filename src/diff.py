@@ -186,6 +186,12 @@ def select_highlight_drops(
     return eligible[:limit]
 
 
+def format_drop_rate(pct: float | None) -> str:
+    if pct is None:
+        return "-"
+    return f"△{pct:.{HIGHLIGHT_RATE_DECIMALS}f}%"
+
+
 def format_highlight_change(change: PriceChange) -> str:
     return format_drop_highlight_text(
         old_price_man=change.old_price_man,

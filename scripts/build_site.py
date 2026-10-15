@@ -15,9 +15,16 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from src.buyer_prefs import (
+    BUILT_AGE_CHOICES,
+    LAYOUT_CHOICES,
+    MAX_WALK_CHOICES,
+    MIN_AREA_CHOICES,
+    area_pref_choices,
+)
 from src.citywide import CitywideComparison, compare_citywide
 from src.daily_insight import build_daily_insight, render_insight_html
-from src.diff import DiffResult, PriceChange, format_man
+from src.diff import DiffResult, PriceChange, drop_rate_pct, format_drop_rate, format_man
 from src.listing_display import (
     WALK_FILTERS,
     area_unit_band,
@@ -52,6 +59,7 @@ DROP_COLUMNS: tuple[tuple[str, str, str, str], ...] = (
     ("old", "旧価格", "number", "price"),
     ("new", "新価格", "number", "price"),
     ("delta", "差額", "number", "exact"),
+    ("rate", "値下げ率", "number", "exact"),
     ("station", "最寄り駅", "text", "text"),
     ("walk", "駅徒歩", "number", "walk"),
     ("area", "面積", "number", "area"),
@@ -161,15 +169,15 @@ def _coverage_section(current: dict) -> str:
     cities = [item for item in rows if item.kind == "city"]
     others = [item for item in rows if item.kind == "other"]
     return (
-        '<section class="card">'
-        "<h2>監視エリア</h2>"
+        '<details class="card fold">'
+        "<summary>監視エリア</summary>"
         '<p class="sub">値下げ一覧は前日比で下がった物件のみです。'
         "市部を含む全エリアの件数はここに出ます。</p>"
         '<div class="area-lists">'
         f"{_coverage_group('23区', wards)}"
         f"{_coverage_group('市部', cities)}"
         f"{_coverage_group('その他', others)}"
-        "</div></section>"
+        "</div></details>"
     )
 
 
@@ -203,6 +211,8 @@ def _row_values(
     old_text = format_man(item.old_price_man)
     new_text = format_man(item.new_price_man)
     area_text = _area_text(item.area_sqm)
+    rate = drop_rate_pct(item)
+    rate_text = format_drop_rate(rate)
     return {
         "name": (item.name, item.name, item.name),
         "ward": (ward, ward, ward),
@@ -223,6 +233,11 @@ def _row_values(
             format_man(item.delta_man),
             str(item.delta_man or ""),
             format_man(item.delta_man),
+        ),
+        "rate": (
+            rate_text,
+            "" if rate is None else f"{rate:.4f}",
+            rate_text,
         ),
         "station": (
             item.station_name or "-",
@@ -356,6 +371,386 @@ def _drop_rows(
     return "".join(rows)
 
 
+def _select_options(values: tuple[int, ...], suffix: str) -> str:
+    options = ['<option value="">指定なし</option>']
+    for value in values:
+        options.append(f'<option value="{value}">{value}{html.escape(suffix)}</option>')
+    return "".join(options)
+
+
+def _prefs_panel() -> str:
+    ward_boxes = []
+    city_boxes = []
+    for name, kind in area_pref_choices():
+        box = (
+            f'<label class="chip"><input type="checkbox" name="pref-ward" '
+            f'value="{_attr(name)}" data-area-kind="{kind}" />{_escape(name)}</label>'
+        )
+        if kind == "ward":
+            ward_boxes.append(box)
+        else:
+            city_boxes.append(box)
+    layout_boxes = "".join(
+        f'<label class="chip"><input type="checkbox" name="pref-layout" '
+        f'value="{_attr(layout)}" />{_escape(layout)}</label>'
+        for layout in LAYOUT_CHOICES
+    )
+    return f"""
+    <section class="card prefs" id="prefs">
+      <div class="prefs-head">
+        <div>
+          <h2>希望条件</h2>
+          <p class="sub">エリア・価格・築年を入れると、高額の圏外物件や築古の安値を外して注目を出せます。この端末に保存します。</p>
+        </div>
+        <div class="pref-actions">
+          <button type="button" data-pref-preset="family">ファミリー目安</button>
+          <button type="button" data-pref-preset="compact">コンパクト</button>
+          <button type="button" id="prefs-clear">条件を消す</button>
+        </div>
+      </div>
+      <div class="pref-grid">
+        <div class="pref-span">
+          <div class="pref-label-row">
+            <span>エリア</span>
+            <span class="pref-shortcuts">
+              <button type="button" data-area-preset="ward">23区</button>
+              <button type="button" data-area-preset="city">市部</button>
+              <button type="button" data-area-preset="none">エリア解除</button>
+            </span>
+          </div>
+          <details class="area-picker" open>
+            <summary>23区</summary>
+            <div class="chip-grid">{"".join(ward_boxes)}</div>
+          </details>
+          <details class="area-picker">
+            <summary>市部</summary>
+            <div class="chip-grid">{"".join(city_boxes)}</div>
+          </details>
+        </div>
+        <label class="pref-field">下限（万円）
+          <input id="prefs-price-min" type="number" min="0" step="100" inputmode="numeric" placeholder="例 4000" />
+        </label>
+        <label class="pref-field">上限（万円）
+          <input id="prefs-price-max" type="number" min="0" step="100" inputmode="numeric" placeholder="例 8000" />
+        </label>
+        <label class="pref-field">築年
+          <select id="prefs-max-age">{_select_options(BUILT_AGE_CHOICES, "年以内")}</select>
+        </label>
+        <label class="pref-field">面積
+          <select id="prefs-min-area">{_select_options(MIN_AREA_CHOICES, "m2以上")}</select>
+        </label>
+        <label class="pref-field">駅徒歩
+          <select id="prefs-max-walk">{_select_options(MAX_WALK_CHOICES, "分以内")}</select>
+        </label>
+        <div class="pref-span">
+          <span class="pref-label-row"><span>間取り</span></span>
+          <div class="chip-grid">{layout_boxes}</div>
+        </div>
+      </div>
+      <p class="pref-summary" id="prefs-summary">条件なし（全市況）</p>
+    </section>
+    """
+
+
+def _page_css() -> str:
+    return """
+    :root {
+      --bg: #f4f1ea;
+      --ink: #1c1a17;
+      --muted: #6a6158;
+      --card: #fffdf8;
+      --line: #e4dbcf;
+      --accent: #0f5c4c;
+      --accent-soft: #e7f3ef;
+      --rate: #b42318;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-padding-top: 6rem; }
+    body {
+      margin: 0;
+      font-family: "Hiragino Sans", "Noto Sans JP", sans-serif;
+      background:
+        radial-gradient(1200px 400px at 10% -10%, #efe4d2 0%, transparent 60%),
+        var(--bg);
+      color: var(--ink);
+      line-height: 1.55;
+    }
+    header {
+      padding: 1.1rem 1rem 0.85rem;
+      position: sticky;
+      top: 0;
+      backdrop-filter: blur(10px);
+      background: rgba(244, 241, 234, 0.92);
+      border-bottom: 1px solid var(--line);
+      z-index: 10;
+    }
+    .header-inner { max-width: 1120px; margin: 0 auto; }
+    .kicker {
+      margin: 0 0 0.2rem;
+      color: var(--accent);
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+    h1 { margin: 0; font-size: 1.28rem; letter-spacing: -0.02em; }
+    h2 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+    .sub { margin: 0.3rem 0 0; color: var(--muted); font-size: 0.88rem; }
+    main { padding: 1rem; max-width: 1120px; margin: 0 auto; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 1rem 1.05rem 1.1rem;
+      margin: 0 0 0.9rem;
+      box-shadow: 0 8px 24px rgba(58, 44, 26, 0.04);
+      scroll-margin-top: 6rem;
+    }
+    details.fold > summary {
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 1.05rem;
+      list-style: none;
+    }
+    details.fold > summary::-webkit-details-marker { display: none; }
+    details.fold > summary::after {
+      content: "開く";
+      float: right;
+      font-weight: 500;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    details.fold[open] > summary::after { content: "閉じる"; }
+    .area-lists {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.85rem;
+      margin-top: 0.7rem;
+    }
+    .area-lists h3 { margin: 0 0 0.2rem; font-size: 0.95rem; }
+    .area-lists ul {
+      margin: 0.35rem 0 0;
+      padding-left: 1.15rem;
+      columns: 2;
+      font-size: 0.82rem;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
+    .metrics div {
+      background: #f6f1e8;
+      border-radius: 14px;
+      padding: 0.6rem 0.7rem;
+    }
+    .metrics .label { display: block; color: var(--muted); font-size: 0.72rem; }
+    .draft {
+      white-space: pre-wrap;
+      background: #1c1a17;
+      color: #f6f3ee;
+      border-radius: 12px;
+      padding: 0.85rem;
+      font-size: 0.86rem;
+      margin: 0.7rem 0 0;
+    }
+    .prefs-head, .pref-label-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem 0.8rem;
+      justify-content: flex-start;
+      align-items: flex-start;
+    }
+    .pref-actions, .pref-shortcuts { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .pref-actions { width: 100%; }
+    .pref-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.7rem;
+      margin-top: 0.85rem;
+    }
+    .pref-span { grid-column: 1 / -1; }
+    .pref-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .pref-field input, .pref-field select,
+    .sort-bar select, tr.filters select, tr.filters input {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.4rem 0.5rem;
+      font: inherit;
+      color: var(--ink);
+      background: #fff;
+    }
+    .chip-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-top: 0.35rem;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 0.18rem 0.55rem;
+      font-size: 0.78rem;
+    }
+    .chip:has(input:checked) {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .area-picker { margin-top: 0.45rem; }
+    .area-picker summary { cursor: pointer; color: var(--muted); font-size: 0.82rem; }
+    .pref-summary {
+      margin: 0.85rem 0 0;
+      font-size: 0.84rem;
+      color: var(--accent);
+    }
+    .pref-actions button, .pref-shortcuts button, .sort-bar button, .sort-btns button {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 0.28rem 0.7rem;
+      font-size: 0.78rem;
+      cursor: pointer;
+      color: var(--ink);
+    }
+    .picks {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.7rem;
+    }
+    .pick, .listing-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 0.8rem 0.9rem;
+      background: #fff;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+    .pick-meta, .card-meta {
+      color: var(--muted);
+      font-size: 0.78rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.6rem;
+    }
+    .pick h3, .listing-card h3 {
+      margin: 0.25rem 0 0.4rem;
+      font-size: 1rem;
+    }
+    .pick-rate {
+      color: var(--rate);
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+    .empty-note { color: var(--muted); margin: 0; }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      min-width: 1280px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      padding: 0.45rem 0.35rem;
+      vertical-align: top;
+    }
+    th[data-key] {
+      color: var(--muted);
+      font-weight: 600;
+      white-space: nowrap;
+      user-select: none;
+    }
+    th[data-key] .sort-label {
+      display: block;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      text-align: left;
+    }
+    th[data-key] .sort-label:hover { color: var(--accent); }
+    .sort-btns { display: inline-flex; gap: 0.15rem; margin-left: 0.2rem; }
+    th[aria-sort="ascending"] .sort-btns button[data-sort-dir="asc"],
+    th[aria-sort="descending"] .sort-btns button[data-sort-dir="desc"] {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+    .sort-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
+      margin: 0.55rem 0 0.75rem;
+    }
+    tr.filters th { padding: 0.2rem 0.2rem 0.45rem; font-weight: 400; }
+    tr.filters select, tr.filters input {
+      width: 100%;
+      min-width: 5.5rem;
+      max-width: 11rem;
+      font-size: 0.72rem;
+    }
+    a { color: var(--accent); }
+    .insight-headline {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 0.35rem 0 0.6rem;
+    }
+    .insight h3 { font-size: 0.92rem; margin: 1rem 0 0.4rem; }
+    .insight ul { margin: 0; padding-left: 1.15rem; }
+    .insight-note { color: var(--muted); font-size: 0.86rem; margin: 0.75rem 0 0; }
+    .insight-bar { margin: 0.35rem 0 0.55rem; }
+    .insight-bar-label {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 0.15rem;
+    }
+    .insight-bar-track {
+      display: block;
+      height: 8px;
+      background: #f3eee5;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .insight-bar-fill { display: block; height: 100%; background: var(--accent); }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+      padding: 1rem;
+    }
+    .drop-cards { display: grid; gap: 0.7rem; margin-bottom: 0.8rem; }
+    @media (min-width: 720px) {
+      .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .area-lists { grid-template-columns: 1fr 1fr; }
+      .pref-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .picks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      h1 { font-size: 1.55rem; }
+    }
+    @media (min-width: 960px) {
+      .picks { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .drop-cards { display: none; }
+    }
+    @media (max-width: 959px) {
+      .desktop-table { display: none; }
+      tr.filters { display: none; }
+    }
+    """
+
+
 def render_html(
     current: dict,
     previous: dict | None,
@@ -383,6 +778,8 @@ def render_html(
     )
     draft = build_tweet_draft(CITYWIDE_AREA_LABEL, summary_diff)
     table_js = TABLE_SCRIPT.read_text(encoding="utf-8")
+    css = _page_css()
+    prefs = _prefs_panel()
 
     return f"""<!DOCTYPE html>
 <html lang="ja">
@@ -391,211 +788,16 @@ def render_html(
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SUUMO価格トラッキング</title>
   <style>
-    :root {{
-      --bg: #f6f3ee;
-      --ink: #1c1a17;
-      --muted: #5f574e;
-      --card: #fffdf8;
-      --line: #ddd4c8;
-      --accent: #0f5c4c;
-    }}
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin: 0;
-      font-family: "Hiragino Sans", "Noto Sans JP", sans-serif;
-      background: linear-gradient(180deg, #efe8dc 0%, var(--bg) 240px);
-      color: var(--ink);
-      line-height: 1.5;
-    }}
-    header {{
-      padding: 1.25rem 1rem 0.75rem;
-      position: sticky;
-      top: 0;
-      backdrop-filter: blur(8px);
-      background: rgba(246, 243, 238, 0.92);
-      border-bottom: 1px solid var(--line);
-      z-index: 10;
-    }}
-    h1 {{ margin: 0; font-size: 1.35rem; }}
-    .sub {{ margin: 0.35rem 0 0; color: var(--muted); font-size: 0.9rem; }}
-    main {{ padding: 1rem; max-width: 1100px; margin: 0 auto; }}
-    .card {{
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 1rem;
-      margin: 0 0 1rem;
-    }}
-    .area-lists {{
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.85rem;
-    }}
-    .area-lists h3 {{
-      margin: 0 0 0.2rem;
-      font-size: 0.95rem;
-    }}
-    .area-lists ul {{
-      margin: 0.35rem 0 0;
-      padding-left: 1.15rem;
-      columns: 2;
-      font-size: 0.82rem;
-    }}
-    .metrics {{
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.5rem;
-    }}
-    .metrics div {{
-      background: #f3eee5;
-      border-radius: 12px;
-      padding: 0.55rem 0.6rem;
-    }}
-    .metrics .label {{ display: block; color: var(--muted); font-size: 0.72rem; }}
-    .draft {{
-      white-space: pre-wrap;
-      background: #1c1a17;
-      color: #f6f3ee;
-      border-radius: 12px;
-      padding: 0.85rem;
-      font-size: 0.86rem;
-    }}
-    .table-wrap {{ overflow-x: auto; -webkit-overflow-scrolling: touch; }}
-    table {{
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.8rem;
-      min-width: 1180px;
-    }}
-    th, td {{
-      border-bottom: 1px solid var(--line);
-      text-align: left;
-      padding: 0.45rem 0.35rem;
-      vertical-align: top;
-    }}
-    th[data-key] {{
-      color: var(--muted);
-      font-weight: 600;
-      white-space: nowrap;
-      user-select: none;
-    }}
-    th[data-key] .sort-label {{
-      display: block;
-      padding: 0;
-      border: 0;
-      background: none;
-      color: inherit;
-      font: inherit;
-      cursor: pointer;
-      text-align: left;
-    }}
-    th[data-key] .sort-label:hover {{ color: var(--accent); }}
-    .sort-btns {{
-      display: inline-flex;
-      gap: 0.15rem;
-      margin-left: 0.2rem;
-    }}
-    .sort-btns button,
-    .sort-bar button {{
-      border: 1px solid var(--line);
-      background: #fff;
-      border-radius: 6px;
-      padding: 0.05rem 0.3rem;
-      font-size: 0.68rem;
-      cursor: pointer;
-      color: var(--muted);
-    }}
-    th[aria-sort="ascending"] .sort-btns button[data-sort-dir="asc"],
-    th[aria-sort="descending"] .sort-btns button[data-sort-dir="desc"] {{
-      color: var(--accent);
-      border-color: var(--accent);
-    }}
-    .sort-bar {{
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem;
-      align-items: center;
-      margin: 0.55rem 0 0.75rem;
-    }}
-    .sort-bar select {{
-      min-width: 8rem;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 0.28rem 0.35rem;
-      background: #fff;
-    }}
-    tr.filters th {{
-      padding: 0.2rem 0.2rem 0.45rem;
-      font-weight: 400;
-    }}
-    tr.filters select,
-    tr.filters input {{
-      width: 100%;
-      min-width: 5.5rem;
-      max-width: 11rem;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 0.28rem 0.2rem;
-      font-size: 0.72rem;
-      background: #fff;
-    }}
-    a {{ color: var(--accent); }}
-    .insight-headline {{
-      font-size: 1.05rem;
-      font-weight: 700;
-      margin: 0.35rem 0 0.6rem;
-    }}
-    .insight h3 {{
-      font-size: 0.92rem;
-      margin: 1rem 0 0.4rem;
-    }}
-    .insight ul {{
-      margin: 0;
-      padding-left: 1.15rem;
-    }}
-    .insight-note {{
-      color: var(--muted);
-      font-size: 0.86rem;
-      margin: 0.75rem 0 0;
-    }}
-    .insight-bar {{
-      margin: 0.35rem 0 0.55rem;
-    }}
-    .insight-bar-label {{
-      display: block;
-      font-size: 0.78rem;
-      color: var(--muted);
-      margin-bottom: 0.15rem;
-    }}
-    .insight-bar-track {{
-      display: block;
-      height: 8px;
-      background: #f3eee5;
-      border-radius: 999px;
-      overflow: hidden;
-    }}
-    .insight-bar-fill {{
-      display: block;
-      height: 100%;
-      background: var(--accent);
-    }}
-    footer {{
-      text-align: center;
-      color: var(--muted);
-      font-size: 0.8rem;
-      padding: 1rem;
-    }}
-    @media (min-width: 720px) {{
-      .metrics {{ grid-template-columns: repeat(4, minmax(0, 1fr)); }}
-      .area-lists {{ grid-template-columns: 1fr 1fr; }}
-      h1 {{ font-size: 1.7rem; }}
-    }}
+{css}
   </style>
 </head>
 <body>
   <header>
-    <h1>SUUMO価格トラッキング</h1>
-    <p class="sub">更新日 {_escape(snapshot_date)} / {config_count}エリア / {listing_count}件<br/>生成 {_escape(generated_at)}</p>
+    <div class="header-inner">
+      <p class="kicker">東京23区・市部 中古マンション</p>
+      <h1>SUUMO価格トラッキング</h1>
+      <p class="sub">更新 {_escape(snapshot_date)} ／ {config_count}エリア ／ {listing_count}件<br/>生成 {_escape(generated_at)}</p>
+    </div>
   </header>
   <main>
     <section class="card">
@@ -606,21 +808,25 @@ def render_html(
         <div><span class="label">更新日</span><strong>{_escape(snapshot_date)}</strong></div>
       </div>
     </section>
-
-    {insight_html}
-
-    {coverage_html}
-
-    <section class="card">
-      <h2>X投稿下書き（23区+市部まとめて）</h2>
-      <pre class="draft">{_escape(draft)}</pre>
+    {prefs}
+    <section class="card" id="my-picks">
+      <h2>あなたの注目</h2>
+      <p class="sub">希望条件に合う値下げを、値下げ率の大きい順に出します。条件が空なら全市況の率順です。</p>
+      <div class="picks" id="my-picks-list"></div>
+      <p class="empty-note" id="my-picks-empty" hidden>条件に合う値下げはありません。エリアや築年を緩めてみてください。</p>
     </section>
-
+    {insight_html}
+    {coverage_html}
+    <details class="card fold">
+      <summary>X投稿下書き（23区+市部まとめて）</summary>
+      <pre class="draft">{_escape(draft)}</pre>
+    </details>
     <section class="card">
-      <h2>値下げ一覧（全エリア横断）</h2>
-      <p class="sub">前日比で下がった物件のみ。市部を含む全エリアの件数は上の監視エリアを見てください。物件名・住所・価格履歴・最寄り駅は文字検索。価格は1000万円単位、駅徒歩は分数、面積は10m2単位で絞り込めます。表示 <span id="drops-visible-count">{len(drops)}</span> / {len(drops)}件</p>
+      <h2>値下げ一覧</h2>
+      <p class="sub">希望条件をかけた件数: <span id="drops-visible-count">{len(drops)}</span> / {len(drops)}件。スマホはカード、広い画面は表です。</p>
       {_sort_bar()}
-      <div class="table-wrap"><table id="drops-table">
+      <div class="drop-cards" id="drop-cards"></div>
+      <div class="table-wrap desktop-table"><table id="drops-table">
         <thead>
           {_header_row()}
           {filter_row}

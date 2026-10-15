@@ -571,7 +571,7 @@ def format_insight_markdown(insight: DailyInsight) -> str:
         for item in insight.ward_yen:
             lines.append(f"- {item.label}: {format_man(item.yen)}")
     if insight.largest_drops:
-        lines.extend(["", "## 値下げ率が大きい物件", ""])
+        lines.extend(["", "## 市況の注目（条件なし）", ""])
         for item in insight.largest_drops:
             lines.append(f"- {item.ward} {item.name}: {_highlight_change_text(item)}")
     lines.extend(
@@ -616,7 +616,7 @@ def render_insight_html(insight: DailyInsight) -> str:
         '<section class="card insight">'
         "<h2>今日の読み取り</h2>"
         f'<p class="sub">{html.escape(insight.previous_date or "-")} → '
-        f"{html.escape(insight.snapshot_date)}</p>"
+        f"{html.escape(insight.snapshot_date)} ／ 全市況です。自分のエリア・価格・築年は希望条件で絞れます。</p>"
         f'<p class="insight-headline">{html.escape(insight.headline)}</p>'
         f"<p>{html.escape(insight.lead)}</p>"
         f'<div class="metrics">{metric_html}</div>'
@@ -678,4 +678,4 @@ def _html_largest(rows: tuple[DropHighlight, ...]) -> str:
             f"{html.escape(_highlight_change_text(item))}"
             "</li>"
         )
-    return "<h3>値下げ率が大きい物件</h3><ul>" + "".join(items) + "</ul>"
+    return "<h3>市況の注目（条件なし）</h3><ul>" + "".join(items) + "</ul>"

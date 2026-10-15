@@ -25,7 +25,17 @@ from src.daily_insight import (
     insight_to_dict,
     previous_payload,
 )
-from src.diff import compare_listings, format_man
+from src.buyer_prefs import (
+    BUILT_AGE_CHOICES,
+    LAYOUT_CHOICES,
+    MAX_WALK_CHOICES,
+    MIN_AREA_CHOICES,
+    BuyerPrefs,
+    area_pref_choices,
+    filter_drops_by_prefs,
+    select_pref_highlights,
+)
+from src.diff import compare_listings, drop_rate_pct, format_highlight_change
 from src.listing_display import (
     WALK_FILTERS,
     area_unit_band,
@@ -149,6 +159,122 @@ def render_dashboard() -> None:
     col2.metric("最新件数（合計）", total_listings)
     col3.metric("値下げ（全エリア）", len(drops))
 
+    snapshot_date = ""
+    for config in configs:
+        snaps = list_snapshots(config.id)
+        if snaps:
+            snapshot_date = snaps[0].snapshot_date
+            break
+
+    st.subheader("希望条件")
+    st.caption(
+        "エリア・価格・築年を入れると、高額の圏外物件や築古の安値を外して注目を出せます。"
+    )
+    area_labels = [name for name, _kind in area_pref_choices()]
+    preset_cols = st.columns(3)
+    if preset_cols[0].button("ファミリー目安"):
+        st.session_state["pref_price_min"] = 4000
+        st.session_state["pref_price_max"] = 9000
+        st.session_state["pref_max_age"] = "25年以内"
+        st.session_state["pref_min_area"] = "55m2以上"
+        st.session_state["pref_max_walk"] = "15分以内"
+        st.session_state["pref_layouts"] = ["2LDK", "3LDK", "4LDK+"]
+        st.rerun()
+    if preset_cols[1].button("コンパクト"):
+        st.session_state["pref_price_min"] = 2500
+        st.session_state["pref_price_max"] = 6000
+        st.session_state["pref_max_age"] = "20年以内"
+        st.session_state["pref_min_area"] = "40m2以上"
+        st.session_state["pref_max_walk"] = "10分以内"
+        st.session_state["pref_layouts"] = ["1LDK", "2LDK"]
+        st.rerun()
+    if preset_cols[2].button("条件を消す"):
+        for key in (
+            "pref_wards",
+            "pref_price_min",
+            "pref_price_max",
+            "pref_max_age",
+            "pref_min_area",
+            "pref_max_walk",
+            "pref_layouts",
+        ):
+            st.session_state.pop(key, None)
+        st.rerun()
+
+    selected_wards = st.multiselect("エリア", area_labels, key="pref_wards")
+    price_cols = st.columns(2)
+    st.session_state.setdefault("pref_price_min", 0)
+    st.session_state.setdefault("pref_price_max", 0)
+    price_min = price_cols[0].number_input(
+        "下限（万円）", min_value=0, step=100, key="pref_price_min"
+    )
+    price_max = price_cols[1].number_input(
+        "上限（万円）", min_value=0, step=100, key="pref_price_max"
+    )
+    age_cols = st.columns(3)
+    none_label = "指定なし"
+    age_choice = age_cols[0].selectbox(
+        "築年",
+        [none_label] + [f"{value}年以内" for value in BUILT_AGE_CHOICES],
+        key="pref_max_age",
+    )
+    area_choice = age_cols[1].selectbox(
+        "面積",
+        [none_label] + [f"{value}m2以上" for value in MIN_AREA_CHOICES],
+        key="pref_min_area",
+    )
+    walk_choice = age_cols[2].selectbox(
+        "駅徒歩",
+        [none_label] + [f"{value}分以内" for value in MAX_WALK_CHOICES],
+        key="pref_max_walk",
+    )
+    selected_layouts = st.multiselect("間取り", list(LAYOUT_CHOICES), key="pref_layouts")
+    prefs = BuyerPrefs(
+        wards=tuple(selected_wards),
+        price_min_man=int(price_min) or None,
+        price_max_man=int(price_max) or None,
+        max_built_age=None if age_choice == none_label else int(age_choice.replace("年以内", "")),
+        min_area_sqm=None
+        if area_choice == none_label
+        else float(area_choice.replace("m2以上", "")),
+        max_walk_minutes=None
+        if walk_choice == none_label
+        else int(walk_choice.replace("分以内", "")),
+        layouts=tuple(selected_layouts),
+    )
+    matched_drops = filter_drops_by_prefs(drops, prefs, snapshot_date)
+    highlights = select_pref_highlights(drops, 7, prefs, snapshot_date)
+
+    st.subheader("あなたの注目")
+    st.caption("希望条件に合う値下げを、値下げ率の大きい順に出します。")
+    if highlights:
+        for row_start in range(0, len(highlights), 3):
+            cols = st.columns(3)
+            for offset, item in enumerate(highlights[row_start : row_start + 3]):
+                with cols[offset]:
+                    st.markdown(f"**{ward_label(item.ward_name)}　{item.name}**")
+                    st.write(format_highlight_change(item))
+                    st.caption(
+                        " · ".join(
+                            part
+                            for part in (
+                                item.layout or "",
+                                format_built_age(item.built_year, snapshot_date),
+                                f"{item.area_sqm:.0f}m2" if item.area_sqm is not None else "",
+                                f"徒歩{item.walk_minutes}分"
+                                if item.walk_minutes is not None
+                                else "",
+                            )
+                            if part
+                        )
+                    )
+                    if item.url:
+                        st.link_button("SUUMO", item.url)
+    elif drops:
+        st.info("条件に合う値下げはありません。エリアや築年を緩めてみてください。")
+    else:
+        st.write("値下げはありません。")
+
     kind_label = {"ward": "23区", "city": "市部", "other": "その他"}
     coverage_rows = []
     for config in configs:
@@ -182,15 +308,9 @@ def render_dashboard() -> None:
         )
         st.markdown(insight.get("markdown") or "")
 
-    st.subheader("値下げ一覧（全エリア横断）")
-    st.caption("前日比で下がった物件のみ。市部を含む全エリアの件数は上の監視エリアを見てください。")
-    snapshot_date = ""
-    for config in configs:
-        snaps = list_snapshots(config.id)
-        if snaps:
-            snapshot_date = snaps[0].snapshot_date
-            break
-    if drops:
+    st.subheader("値下げ一覧")
+    st.caption("希望条件をかけた前日比の値下げです。市部を含む全エリアの件数は上の監視エリアを見てください。")
+    if matched_drops:
         drop_df = pd.DataFrame(
             [
                 {
@@ -204,6 +324,7 @@ def render_dashboard() -> None:
                     "旧価格": item.old_price_man,
                     "新価格": item.new_price_man,
                     "差額": item.delta_man,
+                    "値下げ率": drop_rate_pct(item),
                     "最寄り駅": item.station_name
                     or parse_station_name(item.station)
                     or "-",
@@ -216,7 +337,7 @@ def render_dashboard() -> None:
                     "階数": item.floor or "-",
                     "URL": item.url,
                 }
-                for item in drops
+                for item in matched_drops
             ]
         )
         all_label = "（すべて）"
@@ -291,10 +412,18 @@ def render_dashboard() -> None:
                     filtered = filtered[filtered[column].astype(str) == query]
 
         sort_cols = st.columns([2, 1])
-        sort_column = sort_cols[0].selectbox("並び替え", list(drop_df.columns), key="drop_sort_column")
+        sort_column = sort_cols[0].selectbox(
+            "並び替え",
+            list(drop_df.columns),
+            index=list(drop_df.columns).index("値下げ率")
+            if "値下げ率" in drop_df.columns
+            else 0,
+            key="drop_sort_column",
+        )
         sort_order = sort_cols[1].radio(
             "順序",
             ("昇順", "降順"),
+            index=1,
             horizontal=True,
             key="drop_sort_order",
         )
@@ -312,11 +441,14 @@ def render_dashboard() -> None:
                 "旧価格": st.column_config.NumberColumn(format="%d万円"),
                 "新価格": st.column_config.NumberColumn(format="%d万円"),
                 "差額": st.column_config.NumberColumn(format="%d万円"),
+                "値下げ率": st.column_config.NumberColumn(format="%.1f%%"),
                 "駅徒歩": st.column_config.NumberColumn(format="%d分"),
                 "面積": st.column_config.NumberColumn(format="%.2f m2"),
                 "URL": st.column_config.LinkColumn("リンク"),
             },
         )
+    elif drops:
+        st.info("条件に合う値下げはありません。エリアや築年を緩めてみてください。")
     else:
         st.write("値下げはありません。")
 
